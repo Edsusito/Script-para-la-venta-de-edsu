@@ -1,0 +1,133 @@
+-- ======================================================  PLAYER LIST INDEPENDIENTE
+--  Vida dinámica real (GetPropertyChangedSignal)
+--  Toggle con tecla N
+-- ======================================================
+
+task.spawn(function()
+    local Players = game:GetService("Players")
+    local UserInputService = game:GetService("UserInputService")
+    local LocalPlayer = Players.LocalPlayer
+    local CoreGui = game:GetService("CoreGui")
+
+    pcall(function()
+        local old = CoreGui:FindFirstChild("PLAYER_LIST_KEY_GUI")
+        if old then old:Destroy() end
+    end)
+
+    local ScreenGui = Instance.new("ScreenGui", CoreGui)
+    ScreenGui.Name = "PLAYER_LIST_KEY_GUI"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.DisplayOrder = 1000
+
+    local Main = Instance.new("Frame", ScreenGui)
+    Main.Size = UDim2.new(0,260,0,300)
+    Main.Position = UDim2.new(0.68,0,0.25,0)
+    Main.BackgroundColor3 = Color3.fromRGB(25,25,25)
+    Main.BorderSizePixel = 0
+    Main.Active = true
+    Main.Draggable = true
+    Main.Visible = false
+    Instance.new("UICorner", Main).CornerRadius = UDim.new(0,14)
+
+    local open = false
+    UserInputService.InputBegan:Connect(function(i,gp)
+        if gp then return end
+        if i.KeyCode == Enum.KeyCode.N then
+            open = not open
+            Main.Visible = open
+        end
+    end)
+
+    local Title = Instance.new("TextLabel", Main)
+    Title.Size = UDim2.new(1,0,0,40)
+    Title.BackgroundTransparency = 1
+    Title.Text = "PL Edsusito"
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 16
+    Title.TextColor3 = Color3.fromRGB(235,235,235)
+
+    local Scroll = Instance.new("ScrollingFrame", Main)
+    Scroll.Size = UDim2.new(1,-12,1,-52)
+    Scroll.Position = UDim2.new(0,6,0,46)
+    Scroll.CanvasSize = UDim2.new(0,0,0,0)
+    Scroll.ScrollBarThickness = 4
+    Scroll.BackgroundTransparency = 1
+    Scroll.BorderSizePixel = 0
+
+    local Layout = Instance.new("UIListLayout", Scroll)
+    Layout.Padding = UDim.new(0,8)
+
+    local function bindHealth(bar, hum)
+        local function update()
+            local r = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+            bar.Size = UDim2.new(r,0,1,0)
+            if r > 0.6 then
+                bar.BackgroundColor3 = Color3.fromRGB(80,200,120)
+            elseif r > 0.3 then
+                bar.BackgroundColor3 = Color3.fromRGB(235,200,80)
+            else
+                bar.BackgroundColor3 = Color3.fromRGB(200,80,80)
+            end
+        end
+        update()
+        hum:GetPropertyChangedSignal("Health"):Connect(update)
+    end
+
+    local function createRow(plr)
+        local Row = Instance.new("Frame")
+        Row.Size = UDim2.new(1,0,0,44)
+        Row.BackgroundColor3 = Color3.fromRGB(38,38,38)
+        Row.BorderSizePixel = 0
+        Instance.new("UICorner", Row).CornerRadius = UDim.new(0,10)
+
+        local Name = Instance.new("TextLabel", Row)
+        Name.Size = UDim2.new(1,-12,0,18)
+        Name.Position = UDim2.new(0,6,0,6)
+        Name.BackgroundTransparency = 1
+        Name.Text = plr.Name
+        Name.Font = Enum.Font.GothamSemibold
+        Name.TextSize = 12
+        Name.TextColor3 = Color3.fromRGB(235,235,235)
+        Name.TextXAlignment = Enum.TextXAlignment.Left
+
+        local BarBG = Instance.new("Frame", Row)
+        BarBG.Size = UDim2.new(1,-12,0,8)
+        BarBG.Position = UDim2.new(0,6,0,28)
+        BarBG.BackgroundColor3 = Color3.fromRGB(60,60,60)
+        BarBG.BorderSizePixel = 0
+        Instance.new("UICorner", BarBG).CornerRadius = UDim.new(0,4)
+
+        local Bar = Instance.new("Frame", BarBG)
+        Bar.Size = UDim2.new(1,0,1,0)
+        Bar.BackgroundColor3 = Color3.fromRGB(80,200,120)
+        Bar.BorderSizePixel = 0
+        Instance.new("UICorner", Bar).CornerRadius = UDim.new(0,4)
+
+        local function onChar(char)
+            local hum = char:WaitForChild("Humanoid",5)
+            if hum then bindHealth(Bar, hum) end
+        end
+
+        if plr.Character then onChar(plr.Character) end
+        plr.CharacterAdded:Connect(onChar)
+
+        return Row
+    end
+
+    local function refresh()
+        for _,c in pairs(Scroll:GetChildren()) do
+            if not c:IsA("UIListLayout") then c:Destroy() end
+        end
+        for _,plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer then
+                createRow(plr).Parent = Scroll
+            end
+        end
+        task.wait()
+        Scroll.CanvasSize = UDim2.new(0,0,0,Layout.AbsoluteContentSize.Y + 6)
+    end
+
+    Players.PlayerAdded:Connect(refresh)
+    Players.PlayerRemoving:Connect(refresh)
+    refresh()
+end)
