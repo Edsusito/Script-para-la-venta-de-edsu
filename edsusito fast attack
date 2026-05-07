@@ -1,206 +1,257 @@
+-- ========================
+-- SERVICIOS
+-- ========================
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
-local FastAttackEnabled = false
-local FastAttackRange = 1200
+local LocalPlayer = Players.LocalPlayer
+
+-- ========================
+-- CONFIG
+-- ========================
+local FAST_ATTACK_RANGE = 1200
+local COOLDOWN = 0.1
 local TOGGLE_KEY = Enum.KeyCode.U
+local MINIMIZE_KEY = Enum.KeyCode.N
 
+-- ========================
+-- REMOTES
+-- ========================
 local Net = ReplicatedStorage.Modules.Net
 local RegisterHit = Net["RE/RegisterHit"]
 local RegisterAttack = Net["RE/RegisterAttack"]
 
-local FastAttackConnection = nil
-local ToggleButton = nil
+-- ========================
+-- STATE
+-- ========================
+local FastAttackEnabled = false
+local lastHitTime = 0
+local AttackThread
+local guiVisible = true
 
-local function CreateGUI()
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "FastAttackGUI"
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- ========================
+-- GUI
+-- ========================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "FA_edsusito_GUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-    local Frame = Instance.new("Frame")
-    Frame.Name = "MainFrame"
-    Frame.Parent = ScreenGui
-    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    Frame.BorderSizePixel = 0
-    Frame.AnchorPoint = Vector2.new(0.5, 0.5)
-    Frame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    Frame.Size = UDim2.new(0, 200, 0, 80)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 230, 0, 100)
+MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MainFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 10)
-    Corner.Parent = Frame
+-- Header
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 30)
+Header.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Header.BorderSizePixel = 0
+Header.Parent = MainFrame
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 10)
 
-    ToggleButton = Instance.new("TextButton")
-    ToggleButton.Name = "ToggleButton"
-    ToggleButton.Parent = Frame
-    ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-    ToggleButton.BorderSizePixel = 0
-    ToggleButton.Position = UDim2.new(0.1, 0, 0.2, 0)
-    ToggleButton.Size = UDim2.new(0.8, 0, 0.6, 0)
-    ToggleButton.Font = Enum.Font.GothamBold
-    ToggleButton.Text = "Fast Attack: OFF"
-    ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleButton.TextSize = 16
-    ToggleButton.TextWrapped = true
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -10, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "FA edsusito"
+Title.TextColor3 = Color3.fromRGB(255,255,255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Header
 
-    local ButtonCorner = Instance.new("UICorner")
-    ButtonCorner.CornerRadius = UDim.new(0, 8)
-    ButtonCorner.Parent = ToggleButton
+-- Button
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0.85, 0, 0, 40)
+ToggleButton.Position = UDim2.new(0.075, 0, 0, 45)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+ToggleButton.Text = "FA edsusito"
+ToggleButton.TextColor3 = Color3.fromRGB(255,255,255)
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.TextSize = 16
+ToggleButton.BorderSizePixel = 0
+ToggleButton.Parent = MainFrame
+Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 8)
 
-    local dragging = false
-    local dragInput, dragStart, startPos
+-- ========================
+-- ANIMACIONES
+-- ========================
+local showTween = TweenService:Create(
+    MainFrame,
+    TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    {Size = UDim2.new(0, 230, 0, 100)}
+)
 
-    Frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = Frame.Position
+local hideTween = TweenService:Create(
+    MainFrame,
+    TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+    {Size = UDim2.new(0, 230, 0, 0)}
+)
 
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
+local buttonIn = TweenService:Create(
+    ToggleButton,
+    TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    {Size = UDim2.new(0.8, 0, 0, 36)}
+)
 
-    Frame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
+local buttonOut = TweenService:Create(
+    ToggleButton,
+    TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    {Size = UDim2.new(0.85, 0, 0, 40)}
+)
 
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            Frame.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
-        end
-    end)
+-- ========================
+-- DRAG
+-- ========================
+local dragging, dragStart, startPos
 
-    ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
 
-    return ToggleButton
-end
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
 
-local function AttackMultipleTargets(targets)
-    pcall(function()
-        if not targets or #targets == 0 then return end
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
 
-        local allTargets = {}
+-- ========================
+-- TARGETS
+-- ========================
+local function GetAllTargets()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
 
-        for _, targetChar in pairs(targets) do
-            local head = targetChar:FindFirstChild("Head")
-            if head then
-                table.insert(allTargets, { targetChar, head })
+    local targets = {}
+
+    local function check(model)
+        local hum = model:FindFirstChild("Humanoid")
+        local root = model:FindFirstChild("HumanoidRootPart")
+        local head = model:FindFirstChild("Head")
+
+        if hum and root and head and hum.Health > 0 then
+            if (root.Position - hrp.Position).Magnitude <= FAST_ATTACK_RANGE then
+                table.insert(targets, {model, head})
             end
         end
+    end
 
-        if #allTargets == 0 then return end
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            check(p.Character)
+        end
+    end
 
+    local enemies = workspace:FindFirstChild("Enemies")
+    if enemies then
+        for _, npc in pairs(enemies:GetChildren()) do
+            check(npc)
+        end
+    end
+
+    return targets
+end
+
+-- ========================
+-- FAST ATTACK
+-- ========================
+local function MultiHitAttack()
+    local targets = GetAllTargets()
+    if not targets or #targets == 0 then return end
+
+    local anchor = targets[1][2]
+    if not anchor or not anchor.Parent then return end
+
+    pcall(function()
         RegisterAttack:FireServer(0)
-
-        local hitArgs = {
-            allTargets[1][2],
-            allTargets
-        }
-
-        RegisterHit:FireServer(unpack(hitArgs))
+        task.wait(0.02)
+        RegisterHit:FireServer(anchor, targets)
+        lastHitTime = os.clock()
     end)
 end
 
 local function StartFastAttack()
-    if FastAttackConnection then
-        task.cancel(FastAttackConnection)
-    end
+    if AttackThread then task.cancel(AttackThread) end
 
-    FastAttackConnection = task.spawn(function()
+    AttackThread = task.spawn(function()
         while FastAttackEnabled do
-            task.wait(0.01)
+            task.wait(COOLDOWN)
+            MultiHitAttack()
 
-            local myChar = Players.LocalPlayer.Character
-            local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-            if not myHRP then continue end
-
-            local targetsInRange = {}
-
-            for _, player in pairs(Players:GetPlayers()) do
-                if player ~= Players.LocalPlayer and player.Character then
-                    local humanoid = player.Character:FindFirstChild("Humanoid")
-                    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-
-                    if humanoid and hrp and humanoid.Health > 0 then
-                        local dist = (hrp.Position - myHRP.Position).Magnitude
-                        if dist <= FastAttackRange then
-                            table.insert(targetsInRange, player.Character)
-                        end
-                    end
-                end
-            end
-
-            local enemiesFolder = workspace:FindFirstChild("Enemies")
-            if enemiesFolder then
-                for _, npc in pairs(enemiesFolder:GetChildren()) do
-                    local humanoid = npc:FindFirstChild("Humanoid")
-                    local hrp = npc:FindFirstChild("HumanoidRootPart")
-
-                    if humanoid and hrp and humanoid.Health > 0 then
-                        local dist = (hrp.Position - myHRP.Position).Magnitude
-                        if dist <= FastAttackRange then
-                            table.insert(targetsInRange, npc)
-                        end
-                    end
-                end
-            end
-
-            if #targetsInRange > 0 then
-                AttackMultipleTargets(targetsInRange)
+            -- watchdog suave (no reinicia nada)
+            if os.clock() - lastHitTime > 1 then
+                task.wait(0.2)
             end
         end
     end)
 end
 
 local function StopFastAttack()
-    if FastAttackConnection then
-        task.cancel(FastAttackConnection)
-        FastAttackConnection = nil
+    if AttackThread then
+        task.cancel(AttackThread)
+        AttackThread = nil
     end
 end
 
 local function ToggleFastAttack()
     FastAttackEnabled = not FastAttackEnabled
+    buttonIn:Play()
+    task.wait(0.05)
+    buttonOut:Play()
 
     if FastAttackEnabled then
-        if ToggleButton then
-            ToggleButton.Text = "Fast Attack: ON"
-            ToggleButton.BackgroundColor3 = Color3.fromRGB(60, 255, 60)
-        end
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(60, 200, 60)
         StartFastAttack()
     else
-        if ToggleButton then
-            ToggleButton.Text = "Fast Attack: OFF"
-            ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-        end
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
         StopFastAttack()
     end
 end
 
-ToggleButton = CreateGUI()
+-- ========================
+-- INPUTS
+-- ========================
+ToggleButton.MouseButton1Click:Connect(ToggleFastAttack)
 
-ToggleButton.MouseButton1Click:Connect(function()
-    ToggleFastAttack()
-end)
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
     if input.KeyCode == TOGGLE_KEY then
         ToggleFastAttack()
+    elseif input.KeyCode == MINIMIZE_KEY then
+        guiVisible = not guiVisible
+
+        if guiVisible then
+            MainFrame.Visible = true
+            showTween:Play()
+        else
+            hideTween:Play()
+            hideTween.Completed:Wait()
+            MainFrame.Visible = false
+        end
     end
 end)
