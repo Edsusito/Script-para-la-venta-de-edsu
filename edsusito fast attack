@@ -11,7 +11,7 @@ local LocalPlayer = Players.LocalPlayer
 -- ========================
 -- CONFIG
 -- ========================
-local FAST_ATTACK_RANGE = 1200
+local FAST_ATTACK_RANGE = 1600
 local COOLDOWN = 0.1
 local TOGGLE_KEY = Enum.KeyCode.U
 local MINIMIZE_KEY = Enum.KeyCode.N
