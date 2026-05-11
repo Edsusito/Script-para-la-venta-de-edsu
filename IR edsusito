@@ -1,0 +1,199 @@
+-- ────────────────────────────────────────────────────────────────
+--  EDSUSITO HUB | FINAL INTEGRATED EDITION
+--  Ataque (G) | Auto Reset | Player List (N) | Panel (M)
+-- ────────────────────────────────────────────────────────────────
+
+local function __run()
+
+-- ──────────────────────────────────
+--  SERVICIOS Y VARIABLES LÓGICA ORIGINAL
+-- ──────────────────────────────────
+local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local Camera = workspace.CurrentCamera
+
+local lp = Players.LocalPlayer
+getgenv().AbuseActive = getgenv().AbuseActive or false
+getgenv().SelectedSlot = Enum.KeyCode.Three
+local ejecutandoAtaque = false
+local espectando = nil
+
+-- ──────────────────────────────────
+--  FUNCIONES ORIGINALES (SIN CAMBIOS)
+-- ──────────────────────────────────
+local function Press(key)
+    VirtualInputManager:SendKeyEvent(true, key, false, game)
+    task.wait(0.01)
+    VirtualInputManager:SendKeyEvent(false, key, false, game)
+end
+
+local function RunHeadLockVoid()
+    if ejecutandoAtaque then return end
+    ejecutandoAtaque = true
+    local char = lp.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local head = char and char:FindFirstChild("Head")
+    local torso = char and (char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso"))
+    if hrp and head and torso then
+        local oldPos = hrp.CFrame
+        Press(Enum.KeyCode.Z)
+        task.wait(0.05) 
+        head.Anchored = true
+        hrp.Anchored = true
+        torso.Anchored = true
+        local voidPos = CFrame.new(923.2, 3000000000000000000000, 32852.8)
+        hrp.CFrame = voidPos
+        torso.CFrame = voidPos
+        task.wait(0.12) 
+        hrp.CFrame = oldPos
+        torso.CFrame = oldPos
+        task.wait(0.05)
+        head.Anchored = false
+        hrp.Anchored = false
+        torso.Anchored = false
+    end
+    ejecutandoAtaque = false
+end
+
+local function ExecuteAbuse()
+    if not getgenv().AbuseActive then return end
+    local char = lp.Character or lp.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart", 5)
+    local hum = char:WaitForChild("Humanoid", 5)
+    if hrp and hum and hum.Health > 0 then
+        hrp.CFrame = hrp.CFrame * CFrame.new(0, 800, 0)
+        Press(getgenv().SelectedSlot)
+        task.wait(0.14)
+        Press(Enum.KeyCode.J)
+        hrp.Anchored = true
+        hrp.CFrame = CFrame.new(923.2, 3000000000000000000000, 32852.8)
+        task.wait(0.05)
+        Press(Enum.KeyCode.Z)
+        task.spawn(function()
+            task.wait(0.04)
+            hum.Health = 0
+        end)
+        task.wait(0.6)
+    end
+end
+
+if not getgenv().HanexRespawnConnection then
+    getgenv().HanexRespawnConnection = lp.CharacterAdded:Connect(function()
+        if getgenv().AbuseActive then
+            task.wait(0.5) 
+            task.spawn(ExecuteAbuse)
+        end
+    end)
+end
+
+-- ──────────────────────────────────
+--  UI: EDSUSITO HUB (MODERNO)
+-- ──────────────────────────────────
+for _, v in pairs(CoreGui:GetChildren()) do
+    if v.Name == "EdsusitoHubGUI" then v:Destroy() end
+end
+
+local Screen = Instance.new("ScreenGui", CoreGui)
+Screen.Name = "EdsusitoHubGUI"
+
+-- PANEL PRINCIPAL (M)
+local Main = Instance.new("Frame", Screen)
+Main.Size = UDim2.new(0, 240, 0, 260)
+Main.Position = UDim2.new(0.5, -120, 0.5, -130)
+Main.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+Main.BorderSizePixel = 0
+Main.Visible = false
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+local Glow = Instance.new("UIStroke", Main); Glow.Color = Color3.fromRGB(0, 120, 255); Glow.Thickness = 1.5
+
+local Header = Instance.new("Frame", Main)
+Header.Size = UDim2.new(1, 0, 0, 45); Header.BackgroundColor3 = Color3.fromRGB(15, 15, 20); Header.BorderSizePixel = 0
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 12)
+local Title = Instance.new("TextLabel", Header)
+Title.Text = "EDSUSITO HUB"; Title.Size = UDim2.new(1, 0, 1, 0); Title.TextColor3 = Color3.new(1,1,1); Title.Font = Enum.Font.GothamBlack; Title.BackgroundTransparency = 1; Title.TextSize = 14
+
+-- BOTONES Y TOGGLE
+local function CreateBtn(text, y, color, cb)
+    local b = Instance.new("TextButton", Main)
+    b.Size = UDim2.new(0.85, 0, 0, 35); b.Position = UDim2.new(0.075, 0, 0, y)
+    b.BackgroundColor3 = Color3.fromRGB(20, 20, 25); b.Text = text; b.TextColor3 = color
+    b.Font = Enum.Font.GothamBold; b.TextSize = 10; Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    b.MouseButton1Click:Connect(cb)
+end
+
+local function CreateToggle(text, y, startVal, cb)
+    local tFrame = Instance.new("Frame", Main)
+    tFrame.Size = UDim2.new(0.85, 0, 0, 35); tFrame.Position = UDim2.new(0.075, 0, 0, y); tFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    Instance.new("UICorner", tFrame).CornerRadius = UDim.new(0, 6)
+    local lbl = Instance.new("TextLabel", tFrame); lbl.Text = text; lbl.Size = UDim2.new(1, -40, 1, 0); lbl.Position = UDim2.new(0, 10, 0, 0); lbl.TextColor3 = Color3.new(0.8,0.8,0.8); lbl.Font = Enum.Font.GothamBold; lbl.TextSize = 10; lbl.BackgroundTransparency = 1; lbl.TextXAlignment = Enum.TextXAlignment.Left
+    local btn = Instance.new("TextButton", tFrame); btn.Size = UDim2.new(0, 30, 0, 18); btn.Position = UDim2.new(1, -35, 0.5, -9); btn.Text = ""; btn.BackgroundColor3 = startVal and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 50, 50); Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+    btn.MouseButton1Click:Connect(function()
+        getgenv().AbuseActive = not getgenv().AbuseActive
+        btn.BackgroundColor3 = getgenv().AbuseActive and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 50, 50)
+        cb(getgenv().AbuseActive)
+    end)
+end
+
+CreateBtn("ATTACK VOID [G]", 55, Color3.fromRGB(0, 120, 255), RunHeadLockVoid)
+CreateToggle("AUTO RESET", 100, getgenv().AbuseActive, function(v) if v then task.spawn(ExecuteAbuse) end end)
+CreateBtn("REPAIR CHAR", 145, Color3.fromRGB(0, 255, 150), function() if lp.Character then for _,v in pairs(lp.Character:GetDescendants()) do if v:IsA("BasePart") then v.Anchored = false end end end Camera.CameraSubject = lp.Character:FindFirstChild("Humanoid") end)
+CreateBtn("PLAYER LIST [N]", 190, Color3.new(1,1,1), function() Screen.PlayerListFrame.Visible = not Screen.PlayerListFrame.Visible end)
+
+-- PLAYER LIST (N)
+local PL = Instance.new("Frame", Screen)
+PL.Name = "PlayerListFrame"; PL.Size = UDim2.new(0, 300, 0, 380); PL.Position = UDim2.new(0.7, 0, 0.2, 0); PL.BackgroundColor3 = Color3.fromRGB(10, 10, 12); PL.BorderSizePixel = 0; PL.Visible = false; PL.Active = true; Instance.new("UICorner", PL).CornerRadius = UDim.new(0, 15); local PLGlow = Instance.new("UIStroke", PL); PLGlow.Color = Color3.fromRGB(0, 120, 255); PLGlow.Thickness = 1.5
+
+local PLHeader = Instance.new("Frame", PL); PLHeader.Size = UDim2.new(1, 0, 0, 45); PLHeader.BackgroundColor3 = Color3.fromRGB(15, 15, 20); PLHeader.BorderSizePixel = 0; Instance.new("UICorner", PLHeader).CornerRadius = UDim.new(0, 15)
+local PLTitle = Instance.new("TextLabel", PLHeader); PLTitle.Text = "PLAYER LIST"; PLTitle.Size = UDim2.new(1, 0, 1, 0); PLTitle.TextColor3 = Color3.new(1,1,1); PLTitle.Font = Enum.Font.GothamBlack; PLTitle.BackgroundTransparency = 1; PLTitle.TextSize = 13
+
+local Scroll = Instance.new("ScrollingFrame", PL); Scroll.Size = UDim2.new(1, -15, 1, -60); Scroll.Position = UDim2.new(0, 7, 0, 55); Scroll.BackgroundTransparency = 1; Scroll.ScrollBarThickness = 1; Scroll.CanvasSize = UDim2.new(0, 0, 0, 0); local Layout = Instance.new("UIListLayout", Scroll); Layout.Padding = UDim.new(0, 8); Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local function CreateCard(plr)
+    local Card = Instance.new("Frame"); Card.Size = UDim2.new(0, 275, 0, 65); Card.BackgroundColor3 = Color3.fromRGB(20, 20, 25); Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 8)
+    local Avatar = Instance.new("ImageLabel", Card); Avatar.Size = UDim2.new(0, 40, 0, 40); Avatar.Position = UDim2.new(0, 10, 0, 8); Avatar.Image = Players:GetUserThumbnailAsync(plr.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100); Instance.new("UICorner", Avatar).CornerRadius = UDim.new(1, 0)
+    local Name = Instance.new("TextLabel", Card); Name.Text = plr.DisplayName; Name.Size = UDim2.new(0, 130, 0, 15); Name.Position = UDim2.new(0, 60, 0, 10); Name.TextColor3 = Color3.new(1,1,1); Name.Font = Enum.Font.GothamBold; Name.TextSize = 11; Name.TextXAlignment = Enum.TextXAlignment.Left; Name.BackgroundTransparency = 1
+    local Spec = Instance.new("TextButton", Card); Spec.Text = "SPECTATE"; Spec.Size = UDim2.new(0, 70, 0, 25); Spec.Position = UDim2.new(1, -80, 0, 10); Spec.BackgroundColor3 = Color3.fromRGB(0, 120, 255); Spec.TextColor3 = Color3.new(1,1,1); Spec.Font = Enum.Font.GothamBold; Spec.TextSize = 8; Instance.new("UICorner", Spec).CornerRadius = UDim.new(0, 5)
+    local BarBG = Instance.new("Frame", Card); BarBG.Size = UDim2.new(1, -20, 0, 3); BarBG.Position = UDim2.new(0, 10, 1, -12); BarBG.BackgroundColor3 = Color3.fromRGB(35, 35, 40); Instance.new("UICorner", BarBG).CornerRadius = UDim.new(1, 0)
+    local Bar = Instance.new("Frame", BarBG); Bar.Size = UDim2.new(1, 0, 1, 0); Bar.BackgroundColor3 = Color3.fromRGB(0, 255, 120); Instance.new("UICorner", Bar).CornerRadius = UDim.new(1, 0)
+    
+    Spec.MouseButton1Click:Connect(function()
+        if espectando == plr then espectando = nil Camera.CameraSubject = lp.Character.Humanoid Spec.Text = "SPECTATE" Spec.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+        else espectando = plr Camera.CameraSubject = plr.Character.Humanoid Spec.Text = "VIEWING" Spec.BackgroundColor3 = Color3.fromRGB(255, 0, 80) end
+    end)
+    task.spawn(function()
+        while task.wait(0.5) do pcall(function() local h = plr.Character.Humanoid local p = math.clamp(h.Health/h.MaxHealth,0,1) Bar.Size = UDim2.new(p,0,1,0) Bar.BackgroundColor3 = p > 0.6 and Color3.fromRGB(0, 255, 120) or p > 0.3 and Color3.fromRGB(255, 200, 0) or Color3.fromRGB(255, 50, 50) end) end
+    end)
+    return Card
+end
+
+local function RefreshPL()
+    for _,v in pairs(Scroll:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+    for _,p in pairs(Players:GetPlayers()) do if p ~= lp then CreateCard(p).Parent = Scroll end end
+    Scroll.CanvasSize = UDim2.new(0,0,0, Layout.AbsoluteContentSize.Y + 10)
+end
+Players.PlayerAdded:Connect(RefreshPL); Players.PlayerRemoving:Connect(RefreshPL); RefreshPL()
+
+-- ARRASTRE
+local function Drag(obj, head)
+    local dragging, input, startPos, startInput
+    head.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true startInput = i.Position startPos = obj.Position end end)
+    UserInputService.InputChanged:Connect(function(i) if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then local delta = i.Position - startInput obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
+    UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+end
+Drag(Main, Header); Drag(PL, PLHeader)
+
+-- INPUTS (G, M, N)
+UserInputService.InputBegan:Connect(function(i, gp)
+    if gp then return end
+    if i.KeyCode == Enum.KeyCode.G then task.spawn(RunHeadLockVoid)
+    elseif i.KeyCode == Enum.KeyCode.M then Main.Visible = not Main.Visible
+    elseif i.KeyCode == Enum.KeyCode.N then PL.Visible = not PL.Visible end
+end)
+
+print("Edsusito Hub Loaded | M: Main | N: Player List | G: Attack")
+
+end
+__run()
