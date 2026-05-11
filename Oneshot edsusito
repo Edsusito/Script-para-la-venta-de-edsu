@@ -10,7 +10,7 @@ local player = Players.LocalPlayer
 -- ========================
 -- CONFIG
 -- ========================
-local TOGGLE_KEY = Enum.KeyCode.G
+local TOGGLE_KEY = Enum.KeyCode.B
 local MINIMIZE_KEY = Enum.KeyCode.N
 
 -- ========================
