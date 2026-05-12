@@ -1,879 +1,216 @@
--- ──────────────────────────────────
---  Edsusito Rango Infinito
---  Auto Bounty — Unknown Range + Haki + Z Spam
---  [EDICIÓN marines]
--- ──────────────────────────────────
+-- ────────────────────────────────────────────────────────────────
+--  RANGO INFINITO PUBLICO EDSUSITO | FINAL MOBILE EDITION
+--  Barras de Vida + Botón Flotante + Nitidez HD
+-- ────────────────────────────────────────────────────────────────
 
 local function __run()
 
--- ──────────────────────────────────
---  [CONFIG]
--- ──────────────────────────────────
+-- [ CONFIG ]
 local CONFIG = {
-    -- Faccion a elegir al llegar al sitio de bounty
-    ["Team"] = "Marines",       -- Pirates o Marines
-
-    -- Arma para el Z Spam
-    ["Weapon"] = "Sword",       -- Sword o Melee
-
-    -- Nivel minimo de jugadores para considerarlos target
-    ["MinLevel"] = 100,
-
-    -- Segundos sin hacer daño antes de hopear
-    ["NoHitTimeout"] = 5,
-
-    -- Config del Server Hop
-    ["HopMinPlayers"] = 8,
-    ["HopMaxPlayers"] = 11,
-    ["HopRegion"] = nil,        -- ej: Brazil, nil = Brazil
-    ["HopFallbackAny"] = true,
+    ["Team"] = "Marines",
+    ["Weapon"] = "Sword",
 }
 
--- ──────────────────────────────────
---  SERVICIOS
--- ──────────────────────────────────
+-- [ SERVICIOS ]
 local Players          = game:GetService("Players")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local RunService          = game:GetService("RunService")
-local HttpService         = game:GetService("HttpService")
 local TweenService        = game:GetService("TweenService")
 local VIM                 = game:GetService("VirtualInputManager")
+local player              = Players.LocalPlayer
+local CommF_             = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 
-local player     = Players.LocalPlayer
-local UP_SPEED   = 1e35
-local orbitSpeed = 500
-local angle      = 0
-
--- ──────────────────────────────────
---  ESTADO
--- ──────────────────────────────────
 local State = {
-    active        = false,
-    enabledCielo  = false,
-    autoHaki      = false,
-    respawnAbuse  = false,
-    massKillEnabled = false,
-    lastHitTime   = os.clock(),
-    lastHitTicks  = {},         -- {[userId] = lastDamageTick}
-    sessionEarned = 0,
-    startBounty   = 0,
-    currentBounty = 0,
-    kills         = 0,
-    status        = "Esperando fraccion...",
-    factionOK     = false,
+    active = false,
+    espectando = nil
 }
 
--- ──────────────────────────────────
---  UTILS
--- ──────────────────────────────────
-local function fmt(n)
-    if not n then return "0" end
-    n = math.floor(n)
-    if n >= 1e9 then return string.format("%.2fB", n/1e9)
-    elseif n >= 1e6 then return string.format("%.2fM", n/1e6)
-    elseif n >= 1e3 then return string.format("%.1fK", n/1e3)
-    end
-    return tostring(n)
-end
-
-local function getBounty()
-    local val = 0
-    pcall(function()
-        local d = player:FindFirstChild("Data")
-        if d then
-            local b = d:FindFirstChild("Bounty") or d:FindFirstChild("Honor") or d:FindFirstChild("Rep")
-            if b and type(b.Value) == "number" then val = b.Value; return end
-        end
-        local ls = player:FindFirstChild("leaderstats")
-        if ls then
-            local b = ls:FindFirstChild("Bounty/Honor") or ls:FindFirstChild("Bounty") or ls:FindFirstChild("Honor")
-            if b and type(b.Value) == "number" then val = b.Value end
-        end
-    end)
-    return val
-end
-
--- ──────────────────────────────────
---  SAVE / LOAD
--- ──────────────────────────────────
-local SAVE_FILE = "zbounty_save.json"
-local function saveData()
-    pcall(function()
-        writefile(SAVE_FILE, HttpService:JSONEncode({
-            sessionEarned = State.sessionEarned,
-            startBounty   = State.startBounty,
-            kills         = State.kills,
-        }))
-    end)
-end
-local function loadData()
-    pcall(function()
-        if isfile and isfile(SAVE_FILE) then
-            local d = HttpService:JSONDecode(readfile(SAVE_FILE))
-            if d then
-                State.sessionEarned = d.sessionEarned or 0
-                State.startBounty   = d.startBounty   or getBounty()
-                State.kills         = d.kills         or 0
-                return
-            end
-        end
-        State.startBounty = getBounty()
-    end)
-end
-
--- ──────────────────────────────────
---  UTILS DE GAMEPLAY
--- ──────────────────────────────────
-local function findChooseTeam()
-    for _, gui in ipairs(player.PlayerGui:GetChildren()) do
-        local ct = gui:FindFirstChild("ChooseTeam", true)
-        if ct then return ct end
-    end
-    return nil
-end
-
-local function hasValidTargets()
-    for _, pl in pairs(Players:GetPlayers()) do
-        if pl ~= player then
-            local level = 0
-            pcall(function()
-                local d = pl:FindFirstChild("Data")
-                if d then
-                    local lv = d:FindFirstChild("Level")
-                    if lv then level = lv.Value end
-                end
-            end)
-            if level >= CONFIG["MinLevel"] then return true end
-        end
-    end
-    return false
-end
-
-local function selectFaction(faction)
-    pcall(function()
-        local remotes  = ReplicatedStorage:FindFirstChild("Remotes")
-        if not remotes then return end
-        local activity = remotes:FindFirstChild("RE/OnEventServiceActivity")
-        local commF    = remotes:FindFirstChild("CommF_")
-        if not activity or not commF then
-            for _, v in pairs(ReplicatedStorage:GetDescendants()) do
-                if v:IsA("RemoteEvent")    and v.Name == "RE/OnEventServiceActivity" then activity = v end
-                if v:IsA("RemoteFunction") and v.Name == "CommF_" then commF = v end
-            end
-        end
-        if activity then activity:FireServer("TeamSelect/Team/" .. faction) end
-        task.wait(0.05)
-        if commF then commF:InvokeServer("SetTeam", faction) end
-    end)
-end
-
-
--- ──────────────────────────────────
---  CORE FUNCTIONS
--- ──────────────────────────────────
-local CommF_ = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
-
+-- [ LÓGICA DE COMBATE ORIGINAL ]
 local function down(key)
     pcall(function()
         local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
         VIM:SendKeyEvent(true, key, false, hrp)
-        task.wait(0.15)
+        task.wait(0.1)
         VIM:SendKeyEvent(false, key, false, hrp)
     end)
 end
 
 local function equip(tooltip)
-    if not tooltip then return end
     pcall(function()
         local char = player.Character or player.CharacterAdded:Wait()
         local hum  = char:FindFirstChildOfClass("Humanoid")
-        if not hum then return end
         for _, tool in pairs(player.Backpack:GetChildren()) do
             if tool:IsA("Tool") and tool.ToolTip == tooltip then
-                if not hum:IsDescendantOf(tool) then
-                    hum:EquipTool(tool); return
-                end
+                hum:EquipTool(tool)
             end
         end
     end)
 end
 
-local function buso()
-    pcall(function()
-        CommF_:InvokeServer("Buso")
-    end)
-end
-
-local function checkcd(weaponTip, key)
-    local result = true
-    pcall(function()
-        local char   = player.Character or player.CharacterAdded:Wait()
-        local hum    = char:FindFirstChildOfClass("Humanoid")
-        local Skills = player.PlayerGui.Main.Skills
-        if not hum then return end
-        for _, tool in ipairs(char:GetChildren()) do
-            if tool:IsA("Tool") and tool.ToolTip == weaponTip and not hum:IsDescendantOf(tool) then
-                local slot = Skills:FindFirstChild(tool.Name)
-                if slot and slot:FindFirstChild(key) then
-                    local cd    = slot[key]:FindFirstChild("Cooldown")
-                    local title = slot[key]:FindFirstChild("Title")
-                    if cd and title then
-                        if cd.Size.X.Scale == 0 and title.TextColor3 == Color3.new(1,1,1) then
-                            result = false
-                        end
-                    end
-                end
-            end
-        end
-    end)
-    return result
-end
-
--- ──────────────────────────────────
---  MASS KILL SYSTEM
--- ──────────────────────────────────
-local function massKill()
-    print("[Edsusito] 💥 ¡INICIANDO MASS KILL!")
-    State.status = "💥 MASS KILL ACTIVADO"
-    
-    local endTime = os.clock() + 2  -- 2 segundos
-    
-    -- Loop de 2 segundos
-    while os.clock() < endTime do
+task.spawn(function()
+    local angle = 0
+    while task.wait() do
+        if not State.active then continue end
         pcall(function()
-            for _, targetPlayer in pairs(Players:GetPlayers()) do
-                if targetPlayer ~= player then
-                    pcall(function()
-                        local targetChar = targetPlayer.Character
-                        if targetChar then
-                            local targetHum = targetChar:FindFirstChildOfClass("Humanoid")
-                            if targetHum and targetHum.Health > 0 then
-                                -- Si está en respawn abuse, resetear para matarlo
-                                if State.massKillEnabled and State.respawnAbuse then
-                                    targetHum.Health = 0
-                                else
-                                    -- Solo matar sin resetear
-                                    targetHum.Health = 0
-                                end
-                            end
-                        end
-                    end)
-                end
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if root then
+                angle = angle + math.rad(25)
+                root.CFrame = root.CFrame * CFrame.new(math.cos(angle)*3, 0, math.sin(angle)*3)
+                pcall(function() CommF_:InvokeServer("Buso") end)
+                equip(CONFIG["Weapon"])
+                task.wait(0.1)
+                down("Z")
+                task.wait(0.4)
+                if char:FindFirstChild("Humanoid") then char.Humanoid.Health = 0 end
             end
         end)
-        task.wait(0.01)  -- Spam rápido
-    end
-    
-    print("[Edsusito] ✓ ¡MASS KILL COMPLETADO!")
-    State.status = "Activo"
-end
-
-task.spawn(function()
-    while task.wait(0.5) do
-        if State.autoHaki then buso() end
-    end
-end)
-
-task.spawn(function()
-    while task.wait() do
-        if not State.respawnAbuse then continue end
-        local char = player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root then
-            angle = angle + math.rad(orbitSpeed)
-            root.CFrame = root.CFrame * CFrame.new(
-                math.cos(angle) * 3, 0, math.sin(angle) * 3
-            )
-        end
-        if State.autoHaki then buso() end
-        equip(CONFIG["Weapon"])
-        task.wait(0.15)
-        down("Z")
-        task.wait(0.5)
-        if char and char:FindFirstChild("Humanoid") then
-            char.Humanoid.Health = 0
-        end
         player.CharacterAdded:Wait()
         task.wait(0.5)
     end
 end)
 
 RunService.RenderStepped:Connect(function(dt)
-    if not State.enabledCielo then return end
-    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if root then
-        root.CFrame = root.CFrame + Vector3.new(0, UP_SPEED * dt, 0)
-    end
-end)
-
--- ──────────────────────────────────
---  DETECTOR DE DAÑO A JUGADORES
--- ──────────────────────────────────
-local function watchPlayer(p)
-    if p == player then return end
-    local function watchChar(char)
-        pcall(function()
-            local hum  = char:WaitForChild("Humanoid", 5)
-            if not hum then return end
-            local last = hum.Health
-            hum:GetPropertyChangedSignal("Health"):Connect(function()
-                local delta = last - hum.Health
-                last = hum.Health
-                if delta > 0 and State.active then
-                    State.lastHitTime = os.clock()
-                end
-            end)
-        end)
-    end
-    p.CharacterAdded:Connect(watchChar)
-    if p.Character then watchChar(p.Character) end
-end
-
-for _, p in ipairs(Players:GetPlayers()) do watchPlayer(p) end
-Players.PlayerAdded:Connect(watchPlayer)
-
-pcall(function()
-    local CommE = ReplicatedStorage:WaitForChild("Remotes", 5)
-        :WaitForChild("CommE", 5)
-    CommE.OnClientEvent:Connect(function(event, ...)
-        if not State.active then return end
-        if event ~= "Notify" then return end
-        local msg = select(1, ...) or ""
-        if msg:find("Bounty<Color=/> from") or msg:find("Honor<Color=/> from") then
-            local earned = tonumber(string.match(msg, ">(%d+)")) or 0
-            State.sessionEarned += earned
-            State.kills         += 1
-            State.lastHitTime    = os.clock()
-            State.currentBounty  = getBounty()
-            saveData()
-        end
+    if not State.active then return end
+    pcall(function()
+        player.Character.HumanoidRootPart.CFrame += Vector3.new(0, 1e5 * dt, 0)
     end)
 end)
 
-task.spawn(function()
-    while task.wait(1) do
-        if not State.active then continue end
-
-        if not hasValidTargets() then
-            print("[Edsusito] Sin targets validos en el server → Hopeando")
-            State.status = "Sin targets → Hopeando"
-            task.wait(2)
-            Hop(); task.wait(5)
-            State.lastHitTime = os.clock()
-            State.status = "Activo"
-            continue
-        end
-
-        local sinceHit = os.clock() - State.lastHitTime
-        if sinceHit >= CONFIG["NoHitTimeout"] then
-            print("[Edsusito] " .. CONFIG["NoHitTimeout"] .. "s sin daño → Hopeando")
-            State.status = "Hopeando..."
-            saveData()
-            Hop(); task.wait(5)
-            State.lastHitTime = os.clock()
-            State.status = "Activo"
-        end
-    end
-end)
-
--- ──────────────────────────────────
---  START / STOP FUNCTIONS
--- ──────────────────────────────────
-local guiReady = false
-local StatusLbl, EarnedLbl, StartLbl, CurrLbl, KillLbl, TimerBar, TimerLbl, StatBadge, PowerBtn, MassKillBtn, MassKillToggle
-
-local function stopAll()
-    State.active        = false
-    State.enabledCielo  = false
-    State.autoHaki      = false
-    State.respawnAbuse  = false
-    State.status        = "Detenido"
-    print("[Edsusito] DETENIDO")
-    if PowerBtn then
-        PowerBtn.BackgroundColor3 = Color3.fromRGB(220, 70, 70)
-        PowerBtn.Text = "⊘  APAGADO"
-    end
-end
-
-local function startAll()
-    loadData()
-    State.active        = true
-    State.enabledCielo  = true
-    State.autoHaki      = true
-    State.respawnAbuse  = true
-    State.lastHitTime   = os.clock()
-    State.currentBounty = getBounty()
-    State.status        = "Activo"
-    print("[Edsusito] ACTIVO — " .. CONFIG["Team"] .. " / " .. CONFIG["Weapon"])
-    if PowerBtn then
-        PowerBtn.BackgroundColor3 = Color3.fromRGB(120, 255, 120)
-        PowerBtn.Text = "◉  ENCENDIDO"
-    end
-end
-
--- ──────────────────────────────────
---  GUI PREMIUM
--- ──────────────────────────────────
-local C = {
-    bg       = Color3.fromRGB(25, 25, 25),
-    panel    = Color3.fromRGB(35, 35, 35),
-    card     = Color3.fromRGB(45, 45, 45),
-    header   = Color3.fromRGB(30, 30, 30),
-    accent   = Color3.fromRGB(180, 180, 180),
-    accentOn = Color3.fromRGB(120, 255, 120),
-    red      = Color3.fromRGB(220, 70,  70),
-    darkRed  = Color3.fromRGB(180, 30,  30),
-    gold     = Color3.fromRGB(255, 200, 80),
-    text     = Color3.fromRGB(230, 230, 230),
-    sub      = Color3.fromRGB(160, 160, 160),
-    div      = Color3.fromRGB(50, 50, 50),
-    pirateC  = Color3.fromRGB(215, 65,  65),
-    marineC  = Color3.fromRGB(55,  125, 215),
+-- [ GUI - COLORES Y DISEÑO ]
+local Theme = {
+    Bg = Color3.fromRGB(15, 15, 18),
+    Header = Color3.fromRGB(22, 22, 28),
+    Accent = Color3.fromRGB(0, 150, 255),
+    Green = Color3.fromRGB(0, 255, 120),
+    Yellow = Color3.fromRGB(255, 200, 0),
+    Red = Color3.fromRGB(255, 50, 70),
+    Card = Color3.fromRGB(25, 25, 32)
 }
 
-for _, parent in ipairs({player.PlayerGui, game:GetService("CoreGui")}) do
-    pcall(function()
-        local old = parent:FindFirstChild("InfiniteRangeUI")
-        if old then old:Destroy() end
-    end)
-end
+local Screen = Instance.new("ScreenGui", game:GetService("CoreGui"))
+Screen.Name = "EdsusitoFinalGUI"
+Screen.ResetOnSpawn = false
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "InfiniteRangeUI"; ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; ScreenGui.DisplayOrder = 999
-local ok2 = pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
-if not ok2 then ScreenGui.Parent = player:WaitForChild("PlayerGui") end
+-- BOTÓN FLOTANTE
+local OpenBtn = Instance.new("TextButton", Screen)
+OpenBtn.Size = UDim2.new(0, 50, 0, 50)
+OpenBtn.Position = UDim2.new(0, 10, 0, 150)
+OpenBtn.BackgroundColor3 = Theme.Accent
+OpenBtn.Text = "🎯"
+OpenBtn.TextSize = 25
+OpenBtn.TextColor3 = Color3.new(1, 1, 1)
+OpenBtn.Draggable = true -- Para que no estorbe en móvil
+Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(1, 0)
+local oStroke = Instance.new("UIStroke", OpenBtn)
+oStroke.Thickness = 2; oStroke.Color = Color3.new(1,1,1)
 
-local ToggleBtn = Instance.new("TextButton", ScreenGui)
-ToggleBtn.Size = UDim2.new(0,160,0,30); ToggleBtn.Position = UDim2.new(0,12,0,12)
-ToggleBtn.BackgroundColor3 = C.card; ToggleBtn.Text = "🎯  Edsusito Rango"
-ToggleBtn.TextColor3 = C.accent; ToggleBtn.TextSize = 11
-ToggleBtn.Font = Enum.Font.GothamBold; ToggleBtn.BorderSizePixel = 0
-ToggleBtn.AutoButtonColor = false
-Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0,7)
-local tst = Instance.new("UIStroke", ToggleBtn); tst.Color = C.accent; tst.Thickness = 1
+-- PANEL PRINCIPAL
+local Main = Instance.new("Frame", Screen)
+Main.Size = UDim2.new(0, 300, 0, 480)
+Main.Position = UDim2.new(0.5, -150, 0.5, -240)
+Main.BackgroundColor3 = Theme.Bg
+Main.BorderSizePixel = 0
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", Main).Color = Theme.Accent
 
-local Main = Instance.new("Frame", ScreenGui)
-Main.Name = "InfiniteRangeMain"; Main.Size = UDim2.new(0,280,0,520)
-Main.Position = UDim2.new(0,12,0,50); Main.BackgroundColor3 = C.bg
-Main.BorderSizePixel = 0; Main.Active = true; Main.Draggable = true
-Main.Visible = false
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0,14)
-local mst = Instance.new("UIStroke", Main); mst.Color = C.accent; mst.Thickness = 1; mst.Transparency = 0.6
-
-task.spawn(function()
-    local t = 0
-    while true do
-        task.wait(0.05)
-        t = t + 0.05
-        if mst and mst.Parent then
-            mst.Transparency = 0.4 + 0.4 * math.abs(math.sin(t * 1.2))
-        end
-    end
+OpenBtn.MouseButton1Click:Connect(function()
+    Main.Visible = not Main.Visible
 end)
 
+-- HEADER
 local Header = Instance.new("Frame", Main)
-Header.Size = UDim2.new(1,0,0,90); Header.BackgroundColor3 = C.header; Header.BorderSizePixel = 0
-Instance.new("UICorner", Header).CornerRadius = UDim.new(0,14)
+Header.Size = UDim2.new(1, 0, 0, 50); Header.BackgroundColor3 = Theme.Header; Header.BorderSizePixel = 0
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 12)
+local Title = Instance.new("TextLabel", Header)
+Title.Text = "RANGO INFINITO PUBLICO EDSUSITO"; Title.Size = UDim2.new(1,0,1,0); Title.TextColor3 = Color3.new(1,1,1); Title.Font = Enum.Font.GothamBlack; Title.TextSize = 12; Title.BackgroundTransparency = 1
+Instance.new("UIStroke", Title).Thickness = 1
 
-local hgrad = Instance.new("UIGradient", Header)
-hgrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 20, 50)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 10, 25)),
-})
-hgrad.Rotation = 90
+-- BOTÓN MAESTRO (HD)
+local PowerBtn = Instance.new("TextButton", Main)
+PowerBtn.Size = UDim2.new(0.9, 0, 0, 90)
+PowerBtn.Position = UDim2.new(0.05, 0, 0, 65)
+PowerBtn.BackgroundColor3 = Theme.Red
+PowerBtn.Text = "SISTEMA\nDESACTIVADO"
+PowerBtn.TextColor3 = Color3.new(1,1,1); PowerBtn.Font = Enum.Font.GothamBlack; PowerBtn.TextSize = 22; PowerBtn.RichText = true
+Instance.new("UICorner", PowerBtn).CornerRadius = UDim.new(0, 10)
+local pStroke = Instance.new("UIStroke", PowerBtn); pStroke.Thickness = 2; pStroke.Color = Color3.new(0,0,0)
 
-local hfix = Instance.new("Frame", Header)
-hfix.Size = UDim2.new(1,0,0,20); hfix.Position = UDim2.new(0,0,1,-20)
-hfix.BackgroundColor3 = C.header; hfix.BorderSizePixel = 0
+-- LISTA DE JUGADORES
+local Scroll = Instance.new("ScrollingFrame", Main)
+Scroll.Size = UDim2.new(0.9, 0, 0, 290)
+Scroll.Position = UDim2.new(0.05, 0, 0, 170)
+Scroll.BackgroundTransparency = 1; Scroll.ScrollBarThickness = 2
+local Layout = Instance.new("UIListLayout", Scroll); Layout.Padding = UDim.new(0, 8)
 
-local AvWrap = Instance.new("Frame", Header)
-AvWrap.Size = UDim2.new(0,58,0,58); AvWrap.Position = UDim2.new(0,14,0.5,-29)
-AvWrap.BackgroundColor3 = Color3.fromRGB(20,22,40); AvWrap.BorderSizePixel = 0
-Instance.new("UICorner", AvWrap).CornerRadius = UDim.new(1,0)
-local avStr = Instance.new("UIStroke", AvWrap); avStr.Color = C.accent; avStr.Thickness = 2
+local function CreateCard(plr)
+    if plr == player then return end
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, -5, 0, 65); Card.BackgroundColor3 = Theme.Card; Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 8)
+    
+    local Avatar = Instance.new("ImageLabel", Card)
+    Avatar.Size = UDim2.new(0, 40, 0, 40); Avatar.Position = UDim2.new(0, 8, 0, 8)
+    Avatar.Image = Players:GetUserThumbnailAsync(plr.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
+    Instance.new("UICorner", Avatar).CornerRadius = UDim.new(1, 0)
 
-local AvImg = Instance.new("ImageLabel", AvWrap)
-AvImg.Size = UDim2.new(1,-6,1,-6); AvImg.Position = UDim2.new(0,3,0,3)
-AvImg.BackgroundTransparency = 1; AvImg.ScaleType = Enum.ScaleType.Crop
-Instance.new("UICorner", AvImg).CornerRadius = UDim.new(1,0)
+    local Name = Instance.new("TextLabel", Card)
+    Name.Text = plr.DisplayName; Name.Size = UDim2.new(0, 110, 0, 20); Name.Position = UDim2.new(0, 55, 0, 8); Name.TextColor3 = Color3.new(1,1,1); Name.Font = Enum.Font.GothamBold; Name.TextSize = 11; Name.TextXAlignment = Enum.TextXAlignment.Left; Name.BackgroundTransparency = 1
 
-task.spawn(function()
-    local ok3, url = pcall(function()
-        return Players:GetUserThumbnailAsync(player.UserId,
-            Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+    local Spec = Instance.new("TextButton", Card)
+    Spec.Text = "VIEW"; Spec.Size = UDim2.new(0, 55, 0, 22); Spec.Position = UDim2.new(1, -65, 0, 8); Spec.BackgroundColor3 = Theme.Accent; Spec.TextColor3 = Color3.new(1,1,1); Spec.Font = Enum.Font.GothamBold; Spec.TextSize = 8; Instance.new("UICorner", Spec).CornerRadius = UDim.new(0, 5)
+
+    -- BARRA DE VIDA
+    local BarBg = Instance.new("Frame", Card)
+    BarBg.Size = UDim2.new(1, -65, 0, 5); BarBg.Position = UDim2.new(0, 55, 1, -15); BarBg.BackgroundColor3 = Color3.fromRGB(40, 40, 45); Instance.new("UICorner", BarBg).CornerRadius = UDim.new(1, 0)
+    local Bar = Instance.new("Frame", BarBg)
+    Bar.Size = UDim2.new(1, 0, 1, 0); Bar.BackgroundColor3 = Theme.Green; Instance.new("UICorner", Bar).CornerRadius = UDim.new(1, 0)
+
+    Spec.MouseButton1Click:Connect(function()
+        if State.espectando == plr then 
+            State.espectando = nil; workspace.CurrentCamera.CameraSubject = player.Character.Humanoid; Spec.Text = "VIEW"; Spec.BackgroundColor3 = Theme.Accent
+        else 
+            State.espectando = plr; workspace.CurrentCamera.CameraSubject = plr.Character.Humanoid; Spec.Text = "LIVE"; Spec.BackgroundColor3 = Theme.Red 
+        end
     end)
-    if ok3 and url then AvImg.Image = url end
-end)
 
-local NameLbl = Instance.new("TextLabel", Header)
-NameLbl.Size = UDim2.new(1,-85,0,22); NameLbl.Position = UDim2.new(0,80,0,12)
-NameLbl.BackgroundTransparency = 1; NameLbl.Text = player.Name
-NameLbl.Font = Enum.Font.GothamBlack; NameLbl.TextSize = 16
-NameLbl.TextColor3 = C.text; NameLbl.TextXAlignment = Enum.TextXAlignment.Left
-
-local FacBadge = Instance.new("TextLabel", Header)
-FacBadge.Size = UDim2.new(0,85,0,20); FacBadge.Position = UDim2.new(0,80,0,37)
-FacBadge.BackgroundColor3 = CONFIG["Team"] == "Pirates" and C.pirateC or C.marineC
-FacBadge.Text = CONFIG["Team"] == "Pirates" and "🏴‍☠️ PIRATA" or "⚓ MARINE"
-FacBadge.Font = Enum.Font.GothamBold; FacBadge.TextSize = 10
-FacBadge.TextColor3 = Color3.new(1,1,1); FacBadge.BorderSizePixel = 0
-Instance.new("UICorner", FacBadge).CornerRadius = UDim.new(0,5)
-
-local WpBadge = Instance.new("TextLabel", Header)
-WpBadge.Size = UDim2.new(0,65,0,20); WpBadge.Position = UDim2.new(0,171,0,37)
-WpBadge.BackgroundColor3 = Color3.fromRGB(50,55,90)
-WpBadge.Text = "⚔️ " .. CONFIG["Weapon"]
-WpBadge.Font = Enum.Font.GothamBold; WpBadge.TextSize = 10
-WpBadge.TextColor3 = Color3.fromRGB(180,190,255); WpBadge.BorderSizePixel = 0
-Instance.new("UICorner", WpBadge).CornerRadius = UDim.new(0,5)
-
-StatBadge = Instance.new("TextLabel", Header)
-StatBadge.Size = UDim2.new(0,85,0,20); StatBadge.Position = UDim2.new(1,-95,0,10)
-StatBadge.BackgroundColor3 = C.red; StatBadge.Text = "● CARGANDO"
-StatBadge.Font = Enum.Font.GothamBold; StatBadge.TextSize = 9
-StatBadge.TextColor3 = Color3.new(1,1,1); StatBadge.BorderSizePixel = 0
-Instance.new("UICorner", StatBadge).CornerRadius = UDim.new(0,5)
-
-local InfoLbl = Instance.new("TextLabel", Header)
-InfoLbl.Size = UDim2.new(1,-80,0,14); InfoLbl.Position = UDim2.new(0,80,0,62)
-InfoLbl.BackgroundTransparency = 1
-InfoLbl.Text = "Hop en " .. CONFIG["NoHitTimeout"] .. "s sin daño  •  Lv." .. CONFIG["MinLevel"] .. "+"
-InfoLbl.Font = Enum.Font.Gotham; InfoLbl.TextSize = 9
-InfoLbl.TextColor3 = C.sub; InfoLbl.TextXAlignment = Enum.TextXAlignment.Left
-
-local function divider(parent, y)
-    local d = Instance.new("Frame", parent)
-    d.Size = UDim2.new(0.86,0,0,1); d.Position = UDim2.new(0.07,0,0,y)
-    d.BackgroundColor3 = C.div; d.BorderSizePixel = 0
-    return d
-end
-divider(Main, 96)
-
-local function card(parent, label, icon, yPos, valueColor)
-    local row = Instance.new("Frame", parent)
-    row.Size = UDim2.new(0.86,0,0,50); row.Position = UDim2.new(0.07,0,0,yPos)
-    row.BackgroundColor3 = C.card; row.BorderSizePixel = 0
-    Instance.new("UICorner", row).CornerRadius = UDim.new(0,10)
-
-    local cg = Instance.new("UIGradient", row)
-    cg.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(20,21,36)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(14,15,26)),
-    })
-    cg.Rotation = 135
-
-    local iconL = Instance.new("TextLabel", row)
-    iconL.Size = UDim2.new(0,30,1,0); iconL.Position = UDim2.new(0,8,0,0)
-    iconL.BackgroundTransparency = 1; iconL.Text = icon
-    iconL.Font = Enum.Font.Gotham; iconL.TextSize = 20
-
-    local lbl = Instance.new("TextLabel", row)
-    lbl.Size = UDim2.new(1,-45,0,16); lbl.Position = UDim2.new(0,40,0,6)
-    lbl.BackgroundTransparency = 1; lbl.Text = label
-    lbl.Font = Enum.Font.Gotham; lbl.TextSize = 9
-    lbl.TextColor3 = C.sub; lbl.TextXAlignment = Enum.TextXAlignment.Left
-
-    local val = Instance.new("TextLabel", row)
-    val.Size = UDim2.new(1,-45,0,24); val.Position = UDim2.new(0,40,0,22)
-    val.BackgroundTransparency = 1; val.Text = "$0"
-    val.Font = Enum.Font.GothamBlack; val.TextSize = 17
-    val.TextColor3 = valueColor or C.text; val.TextXAlignment = Enum.TextXAlignment.Left
-
-    return val
+    task.spawn(function()
+        while Card.Parent do
+            pcall(function()
+                local h = plr.Character.Humanoid
+                local pct = math.clamp(h.Health / h.MaxHealth, 0, 1)
+                Bar.Size = UDim2.new(pct, 0, 1, 0)
+                Bar.BackgroundColor3 = pct > 0.6 and Theme.Green or pct > 0.3 and Theme.Yellow or Theme.Red
+            end)
+            task.wait(0.5)
+        end
+    end)
+    return Card
 end
 
-StartLbl  = card(Main, "HONOR INICIAL",   "💰", 104,  C.sub)
-EarnedLbl = card(Main, "GANADO EN SESION", "📈", 162,  C.accentOn)
-CurrLbl   = card(Main, "HONOR ACTUAL",    "⭐", 220,  C.gold)
+local function Refresh()
+    for _, v in pairs(Scroll:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+    for _, p in pairs(Players:GetPlayers()) do
+        local c = CreateCard(p); if c then c.Parent = Scroll end
+    end
+    Scroll.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 10)
+end
 
-local krow = Instance.new("Frame", Main)
-krow.Size = UDim2.new(0.86,0,0,38); krow.Position = UDim2.new(0.07,0,0,278)
-krow.BackgroundColor3 = C.card; krow.BorderSizePixel = 0
-Instance.new("UICorner", krow).CornerRadius = UDim.new(0,10)
-
-KillLbl = Instance.new("TextLabel", krow)
-KillLbl.Size = UDim2.new(0.5,0,1,0); KillLbl.Position = UDim2.new(0,10,0,0)
-KillLbl.BackgroundTransparency = 1; KillLbl.Text = "💀  Kills: 0"
-KillLbl.Font = Enum.Font.GothamBold; KillLbl.TextSize = 13
-KillLbl.TextColor3 = C.text; KillLbl.TextXAlignment = Enum.TextXAlignment.Left
-
-TimerLbl = Instance.new("TextLabel", krow)
-TimerLbl.Size = UDim2.new(0.5,-10,1,0); TimerLbl.Position = UDim2.new(0.5,0,0,0)
-TimerLbl.BackgroundTransparency = 1; TimerLbl.Text = ""
-TimerLbl.Font = Enum.Font.Gotham; TimerLbl.TextSize = 12
-TimerLbl.TextColor3 = C.sub; TimerLbl.TextXAlignment = Enum.TextXAlignment.Right
-
-local barBg = Instance.new("Frame", Main)
-barBg.Size = UDim2.new(0.86,0,0,6); barBg.Position = UDim2.new(0.07,0,0,322)
-barBg.BackgroundColor3 = C.div; barBg.BorderSizePixel = 0
-Instance.new("UICorner", barBg).CornerRadius = UDim.new(0,3)
-
-TimerBar = Instance.new("Frame", barBg)
-TimerBar.Size = UDim2.new(1,0,1,0); TimerBar.BackgroundColor3 = C.accentOn
-TimerBar.BorderSizePixel = 0
-Instance.new("UICorner", TimerBar).CornerRadius = UDim.new(0,3)
-local tgrad = Instance.new("UIGradient", TimerBar)
-tgrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, C.accentOn),
-    ColorSequenceKeypoint.new(1, C.accent),
-})
-
-StatusLbl = Instance.new("TextLabel", Main)
-StatusLbl.Size = UDim2.new(0.86,0,0,18); StatusLbl.Position = UDim2.new(0.07,0,0,334)
-StatusLbl.BackgroundTransparency = 1; StatusLbl.Text = "Esperando fraccion..."
-StatusLbl.Font = Enum.Font.Gotham; StatusLbl.TextSize = 10
-StatusLbl.TextColor3 = C.sub; StatusLbl.TextXAlignment = Enum.TextXAlignment.Center
-
-divider(Main, 358)
-
--- ──────────────────────────────────
---  BUTTONS (ON/OFF + MASS KILL)
--- ──────────────────────────────────
-PowerBtn = Instance.new("TextButton", Main)
-PowerBtn.Size = UDim2.new(0.42, 0, 0, 35)
-PowerBtn.Position = UDim2.new(0.07, 0, 0, 366)
-PowerBtn.BackgroundColor3 = C.red
-PowerBtn.Text = "⊘  APAGADO"
-PowerBtn.TextColor3 = Color3.new(1, 1, 1)
-PowerBtn.TextSize = 12
-PowerBtn.Font = Enum.Font.GothamBold
-PowerBtn.BorderSizePixel = 0
-PowerBtn.AutoButtonColor = false
-Instance.new("UICorner", PowerBtn).CornerRadius = UDim.new(0, 8)
-local pst = Instance.new("UIStroke", PowerBtn)
-pst.Color = Color3.new(1, 1, 1)
-pst.Thickness = 1.5
+Players.PlayerAdded:Connect(Refresh); Players.PlayerRemoving:Connect(Refresh); Refresh()
 
 PowerBtn.MouseButton1Click:Connect(function()
-    if State.active then
-        stopAll()
-    else
-        startAll()
-    end
+    State.active = not State.active
+    PowerBtn.BackgroundColor3 = State.active and Theme.Green or Theme.Red
+    PowerBtn.Text = State.active and "SISTEMA\nENCENDIDO" or "SISTEMA\nDESACTIVADO"
 end)
 
-PowerBtn.MouseEnter:Connect(function()
-    TweenService:Create(PowerBtn, TweenInfo.new(0.2), {BackgroundTransparency = 0.1}):Play()
-end)
+-- ARRASTRE PANEL
+local d1, d2, d3
+Header.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then d1 = true; d2 = i.Position; d3 = Main.Position end end)
+game:GetService("UserInputService").InputChanged:Connect(function(i) if d1 and i.UserInputType == Enum.UserInputType.MouseMovement then local delta = i.Position - d2; Main.Position = UDim2.new(d3.X.Scale, d3.X.Offset + delta.X, d3.Y.Scale, d3.Y.Offset + delta.Y) end end)
+game:GetService("UserInputService").InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then d1 = false end end)
 
-PowerBtn.MouseLeave:Connect(function()
-    TweenService:Create(PowerBtn, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
-end)
+print("Edsusito Rango Final Cargado - ¡Listo para móvil!")
 
--- TOGGLE MASS KILL
-MassKillToggle = Instance.new("TextButton", Main)
-MassKillToggle.Size = UDim2.new(0.42, 0, 0, 35)
-MassKillToggle.Position = UDim2.new(0.51, 0, 0, 366)
-MassKillToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-MassKillToggle.Text = "⊘  MASS KILL OFF"
-MassKillToggle.TextColor3 = Color3.new(1, 1, 1)
-MassKillToggle.TextSize = 11
-MassKillToggle.Font = Enum.Font.GothamBold
-MassKillToggle.BorderSizePixel = 0
-MassKillToggle.AutoButtonColor = false
-Instance.new("UICorner", MassKillToggle).CornerRadius = UDim.new(0, 8)
-local mkt = Instance.new("UIStroke", MassKillToggle)
-mkt.Color = Color3.new(1, 1, 1)
-mkt.Thickness = 1.5
-
-MassKillToggle.MouseButton1Click:Connect(function()
-    State.massKillEnabled = not State.massKillEnabled
-    if State.massKillEnabled then
-        MassKillToggle.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-        MassKillToggle.Text = "◉  MASS KILL ON"
-        print("[Edsusito] Mass Kill ACTIVADO")
-    else
-        MassKillToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-        MassKillToggle.Text = "⊘  MASS KILL OFF"
-        print("[Edsusito] Mass Kill DESACTIVADO")
-    end
-end)
-
-MassKillToggle.MouseEnter:Connect(function()
-    TweenService:Create(MassKillToggle, TweenInfo.new(0.2), {BackgroundTransparency = 0.1}):Play()
-end)
-
-MassKillToggle.MouseLeave:Connect(function()
-    TweenService:Create(MassKillToggle, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
-end)
-
-divider(Main, 408)
-
--- MASS KILL BUTTON (UNA SOLA VEZ)
-MassKillBtn = Instance.new("TextButton", Main)
-MassKillBtn.Size = UDim2.new(0.86, 0, 0, 40)
-MassKillBtn.Position = UDim2.new(0.07, 0, 0, 415)
-MassKillBtn.BackgroundColor3 = C.darkRed
-MassKillBtn.Text = "💥  CRASH MASS KILL (2s)"
-MassKillBtn.TextColor3 = Color3.new(1, 1, 1)
-MassKillBtn.TextSize = 12
-MassKillBtn.Font = Enum.Font.GothamBlack
-MassKillBtn.BorderSizePixel = 0
-MassKillBtn.AutoButtonColor = false
-Instance.new("UICorner", MassKillBtn).CornerRadius = UDim.new(0, 8)
-local mkb = Instance.new("UIStroke", MassKillBtn)
-mkb.Color = Color3.new(1, 1, 1)
-mkb.Thickness = 2
-
-MassKillBtn.MouseButton1Click:Connect(function()
-    if State.massKillEnabled then
-        task.spawn(massKill)
-    else
-        print("[Edsusito] ⚠️ Mass Kill DESACTIVADO. Actívalo primero!")
-    end
-end)
-
-MassKillBtn.MouseEnter:Connect(function()
-    TweenService:Create(MassKillBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(220, 50, 50)}):Play()
-    TweenService:Create(MassKillBtn, TweenInfo.new(0.2), {BackgroundTransparency = 0.1}):Play()
-end)
-
-MassKillBtn.MouseLeave:Connect(function()
-    TweenService:Create(MassKillBtn, TweenInfo.new(0.2), {BackgroundColor3 = C.darkRed}):Play()
-    TweenService:Create(MassKillBtn, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
-end)
-
-local footer = Instance.new("TextLabel", Main)
-footer.Size = UDim2.new(1,0,0,18); footer.Position = UDim2.new(0,0,0,468)
-footer.BackgroundTransparency = 1; footer.Text = "v1.0  •  Edsusito Rango Infinito"
-footer.Font = Enum.Font.Gotham; footer.TextSize = 9
-footer.TextColor3 = C.div; footer.TextXAlignment = Enum.TextXAlignment.Center
-
-ToggleBtn.MouseButton1Click:Connect(function()
-    if Main.Visible then
-        TweenService:Create(Main, TweenInfo.new(0.15), {Position = UDim2.new(0,12,0,50), BackgroundTransparency = 1}):Play()
-        task.wait(0.15); Main.Visible = false; Main.BackgroundTransparency = 0
-    else
-        Main.Visible = true
-    end
-end)
-
-local prefix = CONFIG["Team"] == "Marines" and "" or "$"
-task.spawn(function()
-    while true do
-        task.wait(0.5)
-        pcall(function()
-            if not guiReady then return end
-            State.currentBounty = getBounty()
-            StartLbl.Text  = prefix .. fmt(State.startBounty)
-            EarnedLbl.Text = "+" .. prefix .. fmt(State.sessionEarned)
-            CurrLbl.Text   = prefix .. fmt(State.currentBounty)
-            KillLbl.Text   = "💀  Kills: " .. State.kills
-
-            if State.active then
-                local sinceHit  = os.clock() - State.lastHitTime
-                local remaining = math.max(0, CONFIG["NoHitTimeout"] - sinceHit)
-                local pct       = remaining / CONFIG["NoHitTimeout"]
-
-                TimerBar.Size      = UDim2.new(pct, 0, 1, 0)
-                tgrad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, pct > 0.4 and C.accentOn or C.red),
-                    ColorSequenceKeypoint.new(1, pct > 0.4 and C.accent   or C.gold),
-                })
-
-                if remaining > 0 then
-                    TimerLbl.Text      = "⏱ " .. math.ceil(remaining) .. "s"
-                    TimerLbl.TextColor3 = pct > 0.4 and C.sub or C.gold
-                else
-                    TimerLbl.Text = "⏱ Hopeando..."
-                    TimerLbl.TextColor3 = C.red
-                end
-
-                StatusLbl.Text = "⚡ " .. State.status
-                StatusLbl.TextColor3 = State.status == "Activo" and C.accentOn or C.gold
-            else
-                StatusLbl.Text = "⊘ " .. State.status
-                StatusLbl.TextColor3 = C.red
-                TimerBar.Size = UDim2.new(0, 0, 1, 0)
-                TimerLbl.Text = ""
-            end
-        end)
-    end
-end)
-
-Main.Visible = true
-guiReady = true
-
-task.spawn(function()
-    print("[Edsusito] Iniciando — Team=" .. CONFIG["Team"] .. " Weapon=" .. CONFIG["Weapon"])
-
-    local confirmed = false
-    local elapsed   = 0
-
-    if player.Team and player.Team.Name == CONFIG["Team"] then
-        print("[Edsusito] Ya somos " .. CONFIG["Team"])
-        confirmed = true
-    elseif player.Team then
-        print("[Edsusito] Team actual: " .. player.Team.Name .. " (necesito " .. CONFIG["Team"] .. ")")
-    else
-        print("[Edsusito] Sin team — buscando pantalla...")
-    end
-
-    while not confirmed do
-        task.wait(0.3); elapsed += 0.3
-
-        selectFaction(CONFIG["Team"])
-        task.wait(0.5)
-
-        if player.Team and player.Team.Name == CONFIG["Team"] then
-            print("[Edsusito] Faccion confirmada: " .. CONFIG["Team"])
-            confirmed = true
-            break
-        end
-
-        local ct = findChooseTeam()
-        if ct and ct.Visible then
-            print("[Edsusito] Pantalla visible → intentando seleccionar " .. CONFIG["Team"])
-        end
-
-        if elapsed >= 30 then
-            print("[Edsusito] Timeout 30s — arrancando sin confirmar faccion")
-            confirmed = true
-        end
-    end
-
-    if player.Team and player.Team.Name == CONFIG["Team"] then
-        StatBadge.Text = "● ACTIVO"
-        StatBadge.BackgroundColor3 = C.accentOn
-    else
-        StatBadge.Text = "● SIN TEAM"
-        StatBadge.BackgroundColor3 = C.gold
-    end
-
-    task.wait(2)
-    if not hasValidTargets() then
-        print("[Edsusito] Sin targets Lv." .. CONFIG["MinLevel"] .. "+ → Hopeando")
-        State.status = "Sin targets → Hopeando"
-        task.wait(2)
-        Hop(); task.wait(5)
-        State.lastHitTime = os.clock()
-        State.status = "Activo"
-    end
-end)
-
-task.spawn(function()
-    local lastVis = false
-    while true do
-        task.wait(0.5)
-        if not State.active then continue end
-        local ct = findChooseTeam()
-        local vis = ct and ct.Visible or false
-        if vis and not lastVis then
-            print("[Edsusito] Nuevo server → seleccionando " .. CONFIG["Team"])
-            task.wait(0.4)
-            for i = 1, 5 do
-                selectFaction(CONFIG["Team"])
-                task.wait(1.2)
-                if player.Team and player.Team.Name == CONFIG["Team"] then break end
-            end
-        end
-        lastVis = vis
-    end
-end)
-
-print("[Edsusito] Loaded — Team=" .. CONFIG["Team"] .. " Weapon=" .. CONFIG["Weapon"])
-
-end -- __run
+end
 __run()
