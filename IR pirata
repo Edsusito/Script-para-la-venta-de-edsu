@@ -1,6 +1,6 @@
 -- 🔒 BLOQUEO DE ACCESO
 local permitidos = {
-    [1111111111] = true, -- usuario 1
+    [2014903362] = true, -- usuario 1
     [2222222222] = true, -- usuario 2
     [3333333333] = true, -- usuario 3
     [4444444444] = true, -- usuario 4
