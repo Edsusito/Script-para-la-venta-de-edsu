@@ -1,3 +1,19 @@
+-- 🔒 BLOQUEO DE ACCESO
+local permitidos = {
+    [1111111111] = true, -- usuario 1
+    [2222222222] = true, -- usuario 2
+    [3333333333] = true, -- usuario 3
+    [4444444444] = true, -- usuario 4
+    [5555555555] = true  -- usuario 5
+}
+
+local jugador = game.Players.LocalPlayer
+
+if not permitidos[jugador.UserId] then
+    return
+end
+
+
 -- ──────────────────────────────────
 --  Edsusito Rango Infinito
 --  Auto Bounty — Unknown Range + Haki + Z Spam
