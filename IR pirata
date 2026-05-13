@@ -1,15 +1,15 @@
 -- 🔒 BLOQUEO DE ACCESO
 local permitidos = {
-    [2014903362] = true -- TU ID
+    [2014903362] = true, -- tú
+    [5356367343] = true  -- tu amigo
 }
 
 local jugador = game.Players.LocalPlayer
 
 if not permitidos[jugador.UserId] then
+    warn("No tienes acceso a este script")
     return
 end
-
-
 
 
 
