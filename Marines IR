@@ -1,3 +1,16 @@
+-- 🔒 BLOQUEO DE ACCESO
+local permitidos = {
+    [2014903362] = true -- TU ID
+}
+
+local jugador = game.Players.LocalPlayer
+
+if not permitidos[jugador.UserId] then
+    return
+end
+
+
+
 -- ──────────────────────────────────
 --  Edsusito Rango Infinito
 --  Auto Bounty — Unknown Range + Haki + Z Spam
