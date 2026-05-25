@@ -1,0 +1,1076 @@
+-- ========================================================
+-- 🌟 EDSUSITO FARM HUB | COMPLETE EDITION
+-- Auto Farm | Raids | Dungeons | Quests | Unlocks
+-- ========================================================
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local TweenService = game:GetService("TweenService")
+
+local LP = Players.LocalPlayer
+
+-- ========================
+-- CONFIG GLOBAL
+-- ========================
+local FAST_ATTACK_RANGE = 1500
+local FARM_HEIGHT = 25
+local AUTO_BUDDHA = true
+
+-- Estados
+local AUTO_FARM_LVL = false
+local AUTO_RAID = false
+local AUTO_CASTLE = false
+local AUTO_SEA_DUNGEON = false
+local AUTO_RING_DUNGEON = false
+local AUTO_RACE_V4 = false
+local AUTO_BOSS = false
+local AUTO_FRUIT = false
+local AUTO_CHEST = false
+
+-- ========================
+-- REMOTES
+-- ========================
+local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
+local RegisterHit = Net["RE/RegisterHit"]
+local RegisterAttack = Net["RE/RegisterAttack"]
+local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+
+-- ========================
+-- TABLA DE ISLAS (LEVEL FARM)
+-- ========================
+local ISLAS = {
+    {1, 9, "Bandit Quest", 1, "Bandit", CFrame.new(1060, 16, 1547)},
+    {10, 14, "Monkey Quest", 1, "Monkey", CFrame.new(-1448, 39, 71)},
+    {15, 29, "Gun Quest", 1, "Pirate", CFrame.new(-1129, 4, 3855)},
+    {30, 39, "Pirate Quest", 1, "Brute", CFrame.new(-1142, 4, 3828)},
+    {40, 59, "Desert Quest", 1, "Desert Bandit", CFrame.new(944, 6, 4373)},
+    {60, 74, "Desert Quest", 2, "Desert Officer", CFrame.new(1547, 6, 4381)},
+    {75, 89, "Snow Quest", 1, "Snow Bandit", CFrame.new(1356, 105, -1335)},
+    {90, 99, "Snow Quest", 2, "Snowman", CFrame.new(1218, 138, -1488)},
+    {100, 119, "Marine Quest2", 1, "Chief Petty Officer", CFrame.new(-5036, 28, 4324)},
+    {120, 149, "Skylands Quest", 1, "Sky Bandit", CFrame.new(-4842, 717, -2623)},
+    {150, 174, "Skylands Quest", 2, "Dark Master", CFrame.new(-7906, 5547, -320)},
+    {175, 189, "Prison Quest", 1, "Prisoner", CFrame.new(4856, 5, 734)},
+    {190, 209, "Prison Quest", 2, "Dangerous Prisoner", CFrame.new(4856, 5, 734)},
+    {210, 249, "Colosseum Quest", 1, "Toga Warrior", CFrame.new(-1577, 7, -2986)},
+    {250, 274, "Colosseum Quest", 2, "Gladiator", CFrame.new(-1577, 7, -2986)},
+    {275, 299, "Magma Quest", 1, "Military Soldier", CFrame.new(-5316, 12, 8517)},
+    {300, 324, "Magma Quest", 2, "Military Spy", CFrame.new(-5316, 12, 8517)},
+    {325, 374, "Fishman Quest", 1, "Fishman Warrior", CFrame.new(61163, 18, 1819)},
+    {375, 399, "Fishman Quest", 2, "Fishman Commando", CFrame.new(61163, 18, 1819)},
+    {400, 449, "SkyExp1 Quest", 1, "God's Guard", CFrame.new(-4721, 845, -1954)},
+    {450, 474, "SkyExp1 Quest", 2, "Shanda", CFrame.new(-7860, 5544, -380)},
+    {475, 524, "SkyExp2 Quest", 1, "Royal Squad", CFrame.new(-7903, 5635, -1410)},
+    {525, 549, "SkyExp2 Quest", 2, "Royal Soldier", CFrame.new(-7903, 5635, -1410)},
+    {550, 624, "Fountain Quest", 1, "Galley Pirate", CFrame.new(5258, 38, 4050)},
+    {625, 699, "Fountain Quest", 2, "Galley Captain", CFrame.new(5258, 38, 4050)},
+    {700, 724, "Area1Quest", 1, "Raider", CFrame.new(-427, 73, 1830)},
+    {725, 774, "Area1Quest", 2, "Mercenary", CFrame.new(-427, 73, 1830)},
+    {775, 824, "Area2Quest", 1, "Swan Pirate", CFrame.new(-2068, 73, 3741)},
+    {825, 874, "Area2Quest", 2, "Factory Staff", CFrame.new(-2068, 73, 3741)},
+    {875, 924, "Area2Quest", 3, "Marine Lieutenant", CFrame.new(-2068, 73, 3741)},
+    {925, 949, "ZombieQuest", 1, "Zombie", CFrame.new(-5494, 48, -794)},
+    {950, 974, "ZombieQuest", 2, "Vampire", CFrame.new(-5494, 48, -794)},
+    {975, 999, "SnowMountainQuest", 1, "Snow Trooper", CFrame.new(606, 401, -5384)},
+    {1000, 1049, "SnowMountainQuest", 2, "Winter Warrior", CFrame.new(606, 401, -5384)},
+    {1050, 1099, "MarineTreeIsland", 1, "Lab Subordinate", CFrame.new(2178, 28, -6724)},
+    {1100, 1149, "MarineTreeIsland", 2, "Horned Warrior", CFrame.new(2178, 28, -6724)},
+    {1150, 1199, "MarineTreeIsland", 3, "Magma Ninja", CFrame.new(2178, 28, -6724)},
+    {1200, 1249, "DeepForestIsland", 1, "Marine Commander", CFrame.new(-12552, 332, -7621)},
+    {1250, 1299, "DeepForestIsland", 2, "Marine Captain", CFrame.new(-12552, 332, -7621)},
+    {1300, 1349, "DeepForestIsland", 3, "Fishman Raider", CFrame.new(-12552, 332, -7621)},
+    {1350, 1424, "DeepForestIsland", 4, "Fishman Captain", CFrame.new(-12552, 332, -7621)},
+    {1425, 1524, "HotIsland", 1, "Jungle Pirate", CFrame.new(-5421, 425, -2666)},
+    {1525, 1574, "Town1Quest", 1, "Pirate Millionaire", CFrame.new(-475, 73, 5567)},
+    {1575, 1624, "ForestQuest", 1, "Pistol Billionaire", CFrame.new(-13232, 333, -7570)},
+    {1625, 1699, "ForestQuest", 2, "Dragon Crew Warrior", CFrame.new(-13232, 333, -7570)},
+    {1700, 1724, "HotIsland", 1, "Dragon Crew Archer", CFrame.new(-5421, 425, -2666)},
+    {1725, 1774, "HotIsland", 2, "Female Islander", CFrame.new(-5421, 425, -2666)},
+    {1775, 1824, "MansionQuest", 1, "Giant Islander", CFrame.new(-12471, 332, -7551)},
+    {1825, 1899, "MansionQuest", 2, "Marine Officer", CFrame.new(-12471, 332, -7551)},
+    {1900, 1999, "BeautifulPirateQuest", 1, "Marine Commodore", CFrame.new(-12471, 332, -7551)},
+    {2000, 2099, "BeautifulPirateQuest", 2, "Sea Soldier", CFrame.new(-12471, 332, -7551)},
+    {2100, 2199, "CakeQuest1", 1, "Water Fighter", CFrame.new(-2103, 36, -12116)},
+    {2200, 2299, "CakeQuest1", 2, "Cake Guard", CFrame.new(-2103, 36, -12116)},
+    {2300, 2399, "CakeQuest2", 1, "Cookie Crafter", CFrame.new(-2103, 36, -12116)},
+    {2400, 2449, "CakeQuest2", 2, "Cake Prince", CFrame.new(-2103, 36, -12116)},
+    {2450, 2524, "ChocQuest", 1, "Chocolate Bar Battler", CFrame.new(146, 21, -12188)},
+    {2525, 2599, "ChocQuest", 2, "Sweet Thief", CFrame.new(146, 21, -12188)},
+    {2600, 9999, "ChocQuest", 3, "Candy Pirate", CFrame.new(146, 21, -12188)},
+}
+
+-- ========================
+-- TABLA DE BOSSES
+-- ========================
+local BOSSES = {
+    {"The Gorilla King", CFrame.new(-1085, 41, -488)},
+    {"Bobby", CFrame.new(-1146, 19, 3827)},
+    {"Yeti", CFrame.new(1209, 138, -1488)},
+    {"Mob Leader", CFrame.new(-1832, 47, 3232)},
+    {"Vice Admiral", CFrame.new(-5039, 28, 4324)},
+    {"Warden", CFrame.new(4856, 5, 734)},
+    {"Chief Warden", CFrame.new(4856, 5, 734)},
+    {"Swan", CFrame.new(2284, 15, 904)},
+    {"Magma Admiral", CFrame.new(-5316, 12, 8517)},
+    {"Fishman Lord", CFrame.new(61163, 18, 1819)},
+    {"Wysper", CFrame.new(-7866, 5546, -380)},
+    {"Thunder God", CFrame.new(-7903, 5635, -1410)},
+    {"Cyborg", CFrame.new(6125, 26, 3886)},
+    {"Don Swan", CFrame.new(2284, 15, 904)},
+    {"Tide Keeper", CFrame.new(-3939, 21, -11705)},
+    {"Diamond", CFrame.new(-2095, 73, 3741)},
+    {"Jeremy", CFrame.new(2074, 28, -6824)},
+    {"Smoke Admiral", CFrame.new(-5060, 28, 4633)},
+}
+
+-- ========================
+-- UTILS
+-- ========================
+local function getLevel()
+    local data = LP:FindFirstChild("Data")
+    if data and data:FindFirstChild("Level") then
+        return data.Level.Value
+    end
+    return 0
+end
+
+local function getMastery()
+    local char = LP.Character
+    if not char then return 0 end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        local lvl = tool:FindFirstChild("Level")
+        if lvl then return lvl.Value end
+    end
+    return 0
+end
+
+local function getCharacter()
+    local char = LP.Character
+    if not char then return nil end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChild("Humanoid")
+    if hrp and hum and hum.Health > 0 then return char, hrp, hum end
+    return nil
+end
+
+local function Press(key)
+    VirtualInputManager:SendKeyEvent(true, key, false, game)
+    task.wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, key, false, game)
+end
+
+local function getIslaParaNivel(lvl)
+    for _, isla in ipairs(ISLAS) do
+        if lvl >= isla[1] and lvl <= isla[2] then
+            return isla
+        end
+    end
+    return ISLAS[#ISLAS]
+end
+
+-- ========================
+-- BUDDHA
+-- ========================
+local function isBuddhaActive()
+    local char = LP.Character
+    if not char then return false end
+    local hum = char:FindFirstChild("Humanoid")
+    if hum and hum.HipHeight > 5 then return true end
+    return false
+end
+
+local function equipBuddha()
+    local backpack = LP:FindFirstChild("Backpack")
+    local char = LP.Character
+    if not char or not backpack then return false end
+    
+    -- Si ya está equipada
+    local equipped = char:FindFirstChild("Buddha-Buddha") or char:FindFirstChild("Buddha")
+    if equipped then return true end
+    
+    -- Buscar en la mochila
+    for _, tool in pairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool.Name:lower():find("buddha") then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum then hum:EquipTool(tool) end
+            return true
+        end
+    end
+    return false
+end
+
+local function activateBuddha()
+    if isBuddhaActive() then return end
+    if equipBuddha() then
+        task.wait(0.3)
+        Press(Enum.KeyCode.Z)
+        task.wait(0.5)
+    end
+end
+
+-- ========================
+-- MOBS
+-- ========================
+local function getMob(nombre)
+    local enemies = workspace:FindFirstChild("Enemies")
+    if not enemies then return nil end
+    
+    local closest = nil
+    local minDist = math.huge
+    local _, myHRP = getCharacter()
+    if not myHRP then return nil end
+    
+    for _, mob in pairs(enemies:GetChildren()) do
+        if mob.Name == nombre then
+            local hum = mob:FindFirstChild("Humanoid")
+            local hrp = mob:FindFirstChild("HumanoidRootPart")
+            if hum and hrp and hum.Health > 0 then
+                local dist = (hrp.Position - myHRP.Position).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    closest = mob
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function getMobsCerca(rango)
+    local enemies = workspace:FindFirstChild("Enemies")
+    if not enemies then return {} end
+    
+    local _, myHRP = getCharacter()
+    if not myHRP then return {} end
+    
+    local mobs = {}
+    for _, mob in pairs(enemies:GetChildren()) do
+        local hum = mob:FindFirstChild("Humanoid")
+        local hrp = mob:FindFirstChild("HumanoidRootPart")
+        local head = mob:FindFirstChild("Head")
+        if hum and hrp and head and hum.Health > 0 then
+            local dist = (hrp.Position - myHRP.Position).Magnitude
+            if dist <= rango then
+                table.insert(mobs, {mob, head})
+            end
+        end
+    end
+    return mobs
+end
+
+-- ========================
+-- FAST ATTACK CON HITBOX
+-- ========================
+local function fastAttack()
+    local mobs = getMobsCerca(FAST_ATTACK_RANGE)
+    if #mobs == 0 then return end
+    
+    pcall(function()
+        RegisterAttack:FireServer(0)
+        task.wait(0.02)
+        RegisterHit:FireServer(mobs[1][2], mobs)
+    end)
+end
+
+local function tpAlMob(mob)
+    local _, myHRP = getCharacter()
+    if not myHRP or not mob then return end
+    local mobHRP = mob:FindFirstChild("HumanoidRootPart")
+    if not mobHRP then return end
+    myHRP.CFrame = mobHRP.CFrame * CFrame.new(0, FARM_HEIGHT, 0)
+end
+
+local function aceptarMision(questGiver, questNum)
+    pcall(function()
+        CommF:InvokeServer("StartQuest", questGiver, questNum)
+    end)
+end
+
+-- ========================
+-- AUTO FARM LEVEL
+-- ========================
+local AutoFarmThread
+local function startAutoFarmLvl()
+    if AutoFarmThread then task.cancel(AutoFarmThread) end
+    AutoFarmThread = task.spawn(function()
+        while AUTO_FARM_LVL do
+            task.wait(0.1)
+            local char, myHRP, hum = getCharacter()
+            if not char then task.wait(1) continue end
+            
+            local lvl = getLevel()
+            local isla = getIslaParaNivel(lvl)
+            if not isla then continue end
+            
+            local _, _, questGiver, questNum, mobName, spawnCF = unpack(isla)
+            
+            if AUTO_BUDDHA and not isBuddhaActive() then
+                activateBuddha()
+                task.wait(0.3)
+            end
+            
+            local mob = getMob(mobName)
+            if not mob then
+                myHRP.CFrame = spawnCF
+                task.wait(0.5)
+                aceptarMision(questGiver, questNum)
+                task.wait(0.5)
+            else
+                tpAlMob(mob)
+                task.wait(0.1)
+                fastAttack()
+            end
+        end
+    end)
+end
+
+-- ========================
+-- AUTO BOSS FARM
+-- ========================
+local AutoBossThread
+local function startAutoBoss()
+    if AutoBossThread then task.cancel(AutoBossThread) end
+    AutoBossThread = task.spawn(function()
+        while AUTO_BOSS do
+            task.wait(0.1)
+            local char, myHRP = getCharacter()
+            if not char then task.wait(1) continue end
+            
+            if AUTO_BUDDHA and not isBuddhaActive() then
+                activateBuddha()
+            end
+            
+            -- Buscar boss vivo más cercano
+            local enemies = workspace:FindFirstChild("Enemies")
+            if not enemies then continue end
+            
+            local foundBoss = nil
+            for _, bossData in ipairs(BOSSES) do
+                local bossName = bossData[1]
+                for _, mob in pairs(enemies:GetChildren()) do
+                    if mob.Name == bossName then
+                        local hum = mob:FindFirstChild("Humanoid")
+                        if hum and hum.Health > 0 then
+                            foundBoss = mob
+                            break
+                        end
+                    end
+                end
+                if foundBoss then break end
+            end
+            
+            if foundBoss then
+                tpAlMob(foundBoss)
+                fastAttack()
+            else
+                -- Ir al primer boss disponible para spawnearlo
+                myHRP.CFrame = BOSSES[1][2]
+                task.wait(1)
+            end
+        end
+    end)
+end
+
+-- ========================
+-- AUTO RAID (CHIPS / FRUIT RAID)
+-- ========================
+local AutoRaidThread
+local function startAutoRaid()
+    if AutoRaidThread then task.cancel(AutoRaidThread) end
+    AutoRaidThread = task.spawn(function()
+        while AUTO_RAID do
+            task.wait(0.5)
+            local char, myHRP = getCharacter()
+            if not char then task.wait(1) continue end
+            
+            if AUTO_BUDDHA and not isBuddhaActive() then
+                activateBuddha()
+            end
+            
+            -- Detectar si estamos en un raid
+            local inRaid = false
+            pcall(function()
+                if workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Island") then
+                    inRaid = true
+                end
+            end)
+            
+            if not inRaid then
+                -- Activar chip de raid
+                pcall(function()
+                    CommF:InvokeServer("StartChipInteraction")
+                end)
+                task.wait(2)
+            else
+                -- Matar mobs del raid
+                local mobs = getMobsCerca(FAST_ATTACK_RANGE)
+                if #mobs > 0 then
+                    tpAlMob(mobs[1][1])
+                    fastAttack()
+                end
+            end
+        end
+    end)
+end
+
+-- ========================
+-- AUTO CASTLE DUNGEON
+-- ========================
+local AutoCastleThread
+local function startAutoCastle()
+    if AutoCastleThread then task.cancel(AutoCastleThread) end
+    AutoCastleThread = task.spawn(function()
+        while AUTO_CASTLE do
+            task.wait(0.3)
+            local char, myHRP = getCharacter()
+            if not char then task.wait(1) continue end
+            
+            if AUTO_BUDDHA and not isBuddhaActive() then
+                activateBuddha()
+            end
+            
+            -- TP a Castle on the Sea
+            local castleCF = CFrame.new(-5421, 314, -2666)
+            
+            -- Buscar enemigos del castillo
+            local enemies = workspace:FindFirstChild("Enemies")
+            if enemies and #enemies:GetChildren() > 0 then
+                local mobs = getMobsCerca(FAST_ATTACK_RANGE)
+                if #mobs > 0 then
+                    tpAlMob(mobs[1][1])
+                    fastAttack()
+                else
+                    myHRP.CFrame = castleCF
+                end
+            else
+                myHRP.CFrame = castleCF
+                task.wait(1)
+            end
+        end
+    end)
+end
+
+-- ========================
+-- AUTO SEA DUNGEON (SEA BEAST)
+-- ========================
+local AutoSeaThread
+local function startAutoSeaDungeon()
+    if AutoSeaThread then task.cancel(AutoSeaThread) end
+    AutoSeaThread = task.spawn(function()
+        while AUTO_SEA_DUNGEON do
+            task.wait(0.3)
+            local char, myHRP = getCharacter()
+            if not char then task.wait(1) continue end
+            
+            -- Buscar Sea Beast
+            local seaBeast = nil
+            for _, npc in pairs(workspace:GetDescendants()) do
+                if npc.Name == "SeaBeast1" or npc.Name == "Sea Beast" then
+                    local hum = npc:FindFirstChildOfClass("Humanoid")
+                    if hum and hum.Health > 0 then
+                        seaBeast = npc
+                        break
+                    end
+                end
+            end
+            
+            if seaBeast then
+                local part = seaBeast:FindFirstChild("HumanoidRootPart") or seaBeast:FindFirstChildWhichIsA("BasePart")
+                if part then
+                    myHRP.CFrame = part.CFrame * CFrame.new(0, 30, 0)
+                    fastAttack()
+                end
+            end
+        end
+    end)
+end
+
+-- ========================
+-- AUTO RING DUNGEON (LAW / TUSHITA)
+-- ========================
+local AutoRingThread
+local function startAutoRingDungeon()
+    if AutoRingThread then task.cancel(AutoRingThread) end
+    AutoRingThread = task.spawn(function()
+        while AUTO_RING_DUNGEON do
+            task.wait(0.3)
+            local char, myHRP = getCharacter()
+            if not char then task.wait(1) continue end
+            
+            if AUTO_BUDDHA and not isBuddhaActive() then
+                activateBuddha()
+            end
+            
+            -- Hay 5 oleadas en el dungeon de anillos
+            local mobs = getMobsCerca(FAST_ATTACK_RANGE * 2)
+            if #mobs > 0 then
+                tpAlMob(mobs[1][1])
+                fastAttack()
+            else
+                task.wait(1)
+            end
+        end
+    end)
+end
+
+-- ========================
+-- AUTO RACE V4
+-- ========================
+local AutoV4Thread
+local function startAutoRaceV4()
+    if AutoV4Thread then task.cancel(AutoV4Thread) end
+    AutoV4Thread = task.spawn(function()
+        while AUTO_RACE_V4 do
+            task.wait(0.5)
+            pcall(function()
+                local backpack = LP:FindFirstChild("Backpack")
+                if backpack and backpack:FindFirstChild("Awakening") then
+                    local rf = backpack.Awakening:FindFirstChildOfClass("RemoteFunction")
+                    if rf then rf:InvokeServer(true) end
+                end
+            end)
+        end
+    end)
+end
+
+-- ========================
+-- AUTO FRUIT (recoger frutas que aparecen)
+-- ========================
+local AutoFruitThread
+local function startAutoFruit()
+    if AutoFruitThread then task.cancel(AutoFruitThread) end
+    AutoFruitThread = task.spawn(function()
+        while AUTO_FRUIT do
+            task.wait(2)
+            local _, myHRP = getCharacter()
+            if not myHRP then continue end
+            
+            for _, obj in pairs(workspace:GetChildren()) do
+                if obj.Name:find("Fruit") and obj:IsA("Tool") then
+                    local handle = obj:FindFirstChild("Handle")
+                    if handle then
+                        myHRP.CFrame = handle.CFrame
+                        task.wait(0.5)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- ========================
+-- AUTO CHEST (recoger cofres)
+-- ========================
+local AutoChestThread
+local function startAutoChest()
+    if AutoChestThread then task.cancel(AutoChestThread) end
+    AutoChestThread = task.spawn(function()
+        while AUTO_CHEST do
+            task.wait(1)
+            local _, myHRP = getCharacter()
+            if not myHRP then continue end
+            
+            for _, obj in pairs(workspace:GetChildren()) do
+                if obj.Name:find("Chest") then
+                    if obj:IsA("Model") and obj.PrimaryPart then
+                        myHRP.CFrame = obj.PrimaryPart.CFrame
+                        task.wait(0.3)
+                    elseif obj:IsA("BasePart") then
+                        myHRP.CFrame = obj.CFrame
+                        task.wait(0.3)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- ========================
+-- GUI - PANEL CON PESTAÑAS
+-- ========================
+for _, v in pairs(CoreGui:GetChildren()) do
+    if v.Name == "EdsusitoFarmHub" then v:Destroy() end
+end
+
+local Screen = Instance.new("ScreenGui")
+Screen.Name = "EdsusitoFarmHub"
+Screen.ResetOnSpawn = false
+Screen.Parent = CoreGui
+
+local Main = Instance.new("Frame", Screen)
+Main.Size = UDim2.new(0, 380, 0, 420)
+Main.Position = UDim2.new(0.5, -190, 0.5, -210)
+Main.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
+Main.BorderSizePixel = 0
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+local Stroke = Instance.new("UIStroke", Main)
+Stroke.Color = Color3.fromRGB(255, 180, 0)
+Stroke.Thickness = 1.5
+
+-- Header
+local Header = Instance.new("Frame", Main)
+Header.Size = UDim2.new(1, 0, 0, 45)
+Header.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+Header.BorderSizePixel = 0
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 12)
+
+local Title = Instance.new("TextLabel", Header)
+Title.Size = UDim2.new(1, -50, 1, 0)
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "🌟 EDSUSITO FARM HUB"
+Title.TextColor3 = Color3.fromRGB(255, 220, 100)
+Title.Font = Enum.Font.GothamBlack
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+local CloseBtn = Instance.new("TextButton", Header)
+CloseBtn.Size = UDim2.new(0, 35, 0, 25)
+CloseBtn.Position = UDim2.new(1, -45, 0.5, -12)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 12
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+
+-- Sidebar (pestañas)
+local Sidebar = Instance.new("Frame", Main)
+Sidebar.Size = UDim2.new(0, 110, 1, -55)
+Sidebar.Position = UDim2.new(0, 5, 0, 50)
+Sidebar.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
+Sidebar.BorderSizePixel = 0
+Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 8)
+
+local SidebarLayout = Instance.new("UIListLayout", Sidebar)
+SidebarLayout.Padding = UDim.new(0, 5)
+SidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+SidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local SidebarPadding = Instance.new("UIPadding", Sidebar)
+SidebarPadding.PaddingTop = UDim.new(0, 8)
+
+-- Content area
+local Content = Instance.new("Frame", Main)
+Content.Size = UDim2.new(1, -125, 1, -55)
+Content.Position = UDim2.new(0, 120, 0, 50)
+Content.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
+Content.BorderSizePixel = 0
+Instance.new("UICorner", Content).CornerRadius = UDim.new(0, 8)
+
+-- Pestañas
+local Tabs = {}
+local TabButtons = {}
+local currentTab = nil
+
+local function CreateTab(name, icon)
+    local btn = Instance.new("TextButton", Sidebar)
+    btn.Size = UDim2.new(1, -10, 0, 32)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+    btn.Text = icon .. "  " .. name
+    btn.TextColor3 = Color3.fromRGB(200, 200, 210)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 11
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.AutoButtonColor = false
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    local padding = Instance.new("UIPadding", btn)
+    padding.PaddingLeft = UDim.new(0, 8)
+    
+    local tabFrame = Instance.new("ScrollingFrame", Content)
+    tabFrame.Size = UDim2.new(1, -10, 1, -10)
+    tabFrame.Position = UDim2.new(0, 5, 0, 5)
+    tabFrame.BackgroundTransparency = 1
+    tabFrame.BorderSizePixel = 0
+    tabFrame.ScrollBarThickness = 2
+    tabFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 180, 0)
+    tabFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    tabFrame.Visible = false
+    
+    local layout = Instance.new("UIListLayout", tabFrame)
+    layout.Padding = UDim.new(0, 6)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        tabFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+    end)
+    
+    btn.MouseButton1Click:Connect(function()
+        for _, t in pairs(Tabs) do t.Visible = false end
+        for _, b in pairs(TabButtons) do b.BackgroundColor3 = Color3.fromRGB(25, 25, 32) end
+        tabFrame.Visible = true
+        btn.BackgroundColor3 = Color3.fromRGB(120, 80, 0)
+        currentTab = tabFrame
+    end)
+    
+    table.insert(Tabs, tabFrame)
+    table.insert(TabButtons, btn)
+    return tabFrame, btn
+end
+
+-- ========================
+-- HELPERS PARA WIDGETS
+-- ========================
+local function CreateToggle(parent, text, callback, default)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, -10, 0, 36)
+    frame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+    
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(1, -50, 1, 0)
+    lbl.Position = UDim2.new(0, 10, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Color3.fromRGB(220, 220, 230)
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local toggle = Instance.new("TextButton", frame)
+    toggle.Size = UDim2.new(0, 36, 0, 20)
+    toggle.Position = UDim2.new(1, -42, 0.5, -10)
+    toggle.Text = ""
+    toggle.BackgroundColor3 = default and Color3.fromRGB(60, 200, 60) or Color3.fromRGB(80, 80, 90)
+    Instance.new("UICorner", toggle).CornerRadius = UDim.new(1, 0)
+    
+    local state = default or false
+    toggle.MouseButton1Click:Connect(function()
+        state = not state
+        toggle.BackgroundColor3 = state and Color3.fromRGB(60, 200, 60) or Color3.fromRGB(80, 80, 90)
+        callback(state)
+    end)
+    return frame
+end
+
+local function CreateButton(parent, text, callback)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(1, -10, 0, 34)
+    btn.BackgroundColor3 = Color3.fromRGB(120, 80, 0)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 11
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+local function CreateLabel(parent, text)
+    local lbl = Instance.new("TextLabel", parent)
+    lbl.Size = UDim2.new(1, -10, 0, 22)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Color3.fromRGB(255, 200, 100)
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    return lbl
+end
+
+-- ========================
+-- PESTAÑA: FARM
+-- ========================
+local FarmTab = CreateTab("Farm", "⚔️")
+
+CreateLabel(FarmTab, "── AUTO FARM LEVEL ──")
+local lvlLabel = CreateLabel(FarmTab, "Nivel: 0")
+local mobLabel = CreateLabel(FarmTab, "Mob: -")
+
+CreateToggle(FarmTab, "🌟 Auto Farm Level (Buddha)", function(v)
+    AUTO_FARM_LVL = v
+    if v then startAutoFarmLvl() end
+end)
+
+CreateToggle(FarmTab, "🧘 Auto Buddha (Auto Activar)", function(v)
+    AUTO_BUDDHA = v
+end, true)
+
+CreateLabel(FarmTab, "── AUTO BOSS ──")
+CreateToggle(FarmTab, "👑 Auto Boss Farm", function(v)
+    AUTO_BOSS = v
+    if v then startAutoBoss() end
+end)
+
+CreateLabel(FarmTab, "── AUTO COLLECTORS ──")
+CreateToggle(FarmTab, "🍎 Auto Recoger Frutas", function(v)
+    AUTO_FRUIT = v
+    if v then startAutoFruit() end
+end)
+
+CreateToggle(FarmTab, "📦 Auto Recoger Cofres", function(v)
+    AUTO_CHEST = v
+    if v then startAutoChest() end
+end)
+
+-- ========================
+-- PESTAÑA: RAIDS
+-- ========================
+local RaidTab = CreateTab("Raids", "🌊")
+
+CreateLabel(RaidTab, "── FRUIT RAIDS ──")
+CreateToggle(RaidTab, "💎 Auto Raid (Fruit/Chips)", function(v)
+    AUTO_RAID = v
+    if v then startAutoRaid() end
+end)
+
+CreateButton(RaidTab, "🏝️ TP a Raid Island", function()
+    local _, myHRP = getCharacter()
+    if myHRP then
+        myHRP.CFrame = CFrame.new(-3046, 240, -10031)
+    end
+end)
+
+CreateLabel(RaidTab, "── RACE V4 AWAKENING ──")
+CreateToggle(RaidTab, "⚡ Auto Race V4 Awakening", function(v)
+    AUTO_RACE_V4 = v
+    if v then startAutoRaceV4() end
+end)
+
+CreateButton(RaidTab, "🌀 TP a Race V4 NPC", function()
+    local _, myHRP = getCharacter()
+    if myHRP then
+        myHRP.CFrame = CFrame.new(-5421, 314, -2666)
+    end
+end)
+
+-- ========================
+-- PESTAÑA: DUNGEONS
+-- ========================
+local DungeonTab = CreateTab("Dungeons", "🏰")
+
+CreateLabel(DungeonTab, "── CASTLE ON THE SEA ──")
+CreateToggle(DungeonTab, "🏰 Auto Castle Dungeon", function(v)
+    AUTO_CASTLE = v
+    if v then startAutoCastle() end
+end)
+
+CreateButton(DungeonTab, "🏰 TP a Castle", function()
+    local _, myHRP = getCharacter()
+    if myHRP then
+        myHRP.CFrame = CFrame.new(-5421, 425, -2666)
+    end
+end)
+
+CreateLabel(DungeonTab, "── SEA BEAST ──")
+CreateToggle(DungeonTab, "🐉 Auto Sea Beast Hunt", function(v)
+    AUTO_SEA_DUNGEON = v
+    if v then startAutoSeaDungeon() end
+end)
+
+CreateLabel(DungeonTab, "── RING DUNGEON ──")
+CreateToggle(DungeonTab, "💍 Auto Ring Dungeon (Law/Tushita)", function(v)
+    AUTO_RING_DUNGEON = v
+    if v then startAutoRingDungeon() end
+end)
+
+CreateButton(DungeonTab, "💍 TP a Ring Dungeon", function()
+    local _, myHRP = getCharacter()
+    if myHRP then
+        myHRP.CFrame = CFrame.new(28011, 5538, -1490)
+    end
+end)
+
+-- ========================
+-- PESTAÑA: TELEPORTS
+-- ========================
+local TpTab = CreateTab("Teleport", "📍")
+
+local TELEPORTS_SEA1 = {
+    {"Starter Island", CFrame.new(1060, 16, 1547)},
+    {"Marine", CFrame.new(-2575, 6, 2045)},
+    {"Jungle", CFrame.new(-1132, 11, 4351)},
+    {"Pirate Village", CFrame.new(-1183, 4, 3829)},
+    {"Desert", CFrame.new(944, 6, 4373)},
+    {"Frozen Village", CFrame.new(1356, 105, -1335)},
+    {"Marineford", CFrame.new(-5036, 28, 4324)},
+    {"Skylands", CFrame.new(-4842, 717, -2623)},
+    {"Prison", CFrame.new(4856, 5, 734)},
+    {"Colosseum", CFrame.new(-1577, 7, -2986)},
+    {"Magma Village", CFrame.new(-5316, 12, 8517)},
+    {"Underwater City", CFrame.new(61163, 18, 1819)},
+    {"Upper Skylands", CFrame.new(-7860, 5544, -380)},
+    {"Fountain City", CFrame.new(5258, 38, 4050)},
+}
+
+local TELEPORTS_SEA2 = {
+    {"Kingdom of Rose", CFrame.new(-427, 73, 1830)},
+    {"Green Zone", CFrame.new(-2068, 73, 3741)},
+    {"Graveyard Island", CFrame.new(-5494, 48, -794)},
+    {"Snow Mountain", CFrame.new(606, 401, -5384)},
+    {"Hot Island", CFrame.new(-5421, 425, -2666)},
+    {"Cursed Ship", CFrame.new(923, 125, 32852)},
+    {"Ice Castle", CFrame.new(6148, 294, -6741)},
+    {"Forgotten Island", CFrame.new(-3043, 240, -10174)},
+}
+
+local TELEPORTS_SEA3 = {
+    {"Port Town", CFrame.new(-475, 73, 5567)},
+    {"Hydra Island", CFrame.new(5232, 605, 345)},
+    {"Floating Turtle", CFrame.new(-13232, 333, -7570)},
+    {"Mansion Island", CFrame.new(-12471, 332, -7551)},
+    {"Great Tree", CFrame.new(2174, 28, -6731)},
+    {"Castle on Sea", CFrame.new(-5421, 425, -2666)},
+    {"Cake Island", CFrame.new(-2103, 36, -12116)},
+    {"Choc Island", CFrame.new(146, 21, -12188)},
+    {"Ice Cream Island", CFrame.new(-902, 18, -10982)},
+}
+
+CreateLabel(TpTab, "── SEA 1 ──")
+for _, tp in ipairs(TELEPORTS_SEA1) do
+    CreateButton(TpTab, "📍 " .. tp[1], function()
+        local _, myHRP = getCharacter()
+        if myHRP then myHRP.CFrame = tp[2] end
+    end)
+end
+
+CreateLabel(TpTab, "── SEA 2 ──")
+for _, tp in ipairs(TELEPORTS_SEA2) do
+    CreateButton(TpTab, "📍 " .. tp[1], function()
+        local _, myHRP = getCharacter()
+        if myHRP then myHRP.CFrame = tp[2] end
+    end)
+end
+
+CreateLabel(TpTab, "── SEA 3 ──")
+for _, tp in ipairs(TELEPORTS_SEA3) do
+    CreateButton(TpTab, "📍 " .. tp[1], function()
+        local _, myHRP = getCharacter()
+        if myHRP then myHRP.CFrame = tp[2] end
+    end)
+end
+
+-- ========================
+-- PESTAÑA: UNLOCKS
+-- ========================
+local UnlockTab = CreateTab("Unlocks", "🔓")
+
+CreateLabel(UnlockTab, "── HABILIDADES ──")
+CreateButton(UnlockTab, "🦾 TP a Buso Haki Master", function()
+    local _, myHRP = getCharacter()
+    if myHRP then myHRP.CFrame = CFrame.new(-5747, 16, -2563) end
+end)
+
+CreateButton(UnlockTab, "👁️ TP a Observation Haki", function()
+    local _, myHRP = getCharacter()
+    if myHRP then myHRP.CFrame = CFrame.new(-5273, 425, -2823) end
+end)
+
+CreateButton(UnlockTab, "💨 TP a Geppo (Sky Walking)", function()
+    local _, myHRP = getCharacter()
+    if myHRP then myHRP.CFrame = CFrame.new(-7886, 5544, -417) end
+end)
+
+CreateButton(UnlockTab, "🗡️ TP a Soru (Fast Movement)", function()
+    local _, myHRP = getCharacter()
+    if myHRP then myHRP.CFrame = CFrame.new(-1543, 30, 50) end
+end)
+
+CreateLabel(UnlockTab, "── RACE V2/V3/V4 ──")
+CreateButton(UnlockTab, "🏃 TP a Race V2 (Diamond)", function()
+    local _, myHRP = getCharacter()
+    if myHRP then myHRP.CFrame = CFrame.new(-5419, 314, -2814) end
+end)
+
+CreateButton(UnlockTab, "⚡ TP a Race V3 (Acidic)", function()
+    local _, myHRP = getCharacter()
+    if myHRP then myHRP.CFrame = CFrame.new(-5247, 391, -2667) end
+end)
+
+CreateButton(UnlockTab, "🌟 TP a Race V4", function()
+    local _, myHRP = getCharacter()
+    if myHRP then myHRP.CFrame = CFrame.new(-5421, 425, -2666) end
+end)
+
+-- ========================
+-- PESTAÑA: MISC
+-- ========================
+local MiscTab = CreateTab("Misc", "⚙️")
+
+CreateLabel(MiscTab, "── UTILIDADES ──")
+CreateButton(MiscTab, "🔧 Reparar Personaje", function()
+    if LP.Character then
+        for _, v in pairs(LP.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.Anchored = false end
+        end
+    end
+end)
+
+CreateButton(MiscTab, "🧘 Activar Buddha", function()
+    activateBuddha()
+end)
+
+CreateButton(MiscTab, "♻️ Re-Equipar Fruta", function()
+    equipBuddha()
+end)
+
+CreateLabel(MiscTab, "── INFO ──")
+local infoLvl = CreateLabel(MiscTab, "Nivel: 0")
+local infoMastery = CreateLabel(MiscTab, "Mastery: 0")
+
+-- ========================
+-- DRAG
+-- ========================
+local dragging, dragStart, startPos
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = Main.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Main.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    Main.Visible = false
+end)
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.K then
+        Main.Visible = not Main.Visible
+    end
+end)
+
+-- Activar primera pestaña
+TabButtons[1].BackgroundColor3 = Color3.fromRGB(120, 80, 0)
+Tabs[1].Visible = true
+currentTab = Tabs[1]
+
+-- ========================
+-- LOOP DE UI UPDATE
+-- ========================
+task.spawn(function()
+    while task.wait(1) do
+        local lvl = getLevel()
+        local isla = getIslaParaNivel(lvl)
+        lvlLabel.Text = "📊 Nivel: " .. lvl
+        if isla then
+            mobLabel.Text = "🎯 Mob: " .. isla[5]
+        end
+        infoLvl.Text = "📊 Nivel: " .. lvl
+        infoMastery.Text = "⚔️ Mastery: " .. getMastery()
+    end
+end)
+
+print("✅ Edsusito Farm Hub cargado | Tecla K para mostrar/ocultar")
