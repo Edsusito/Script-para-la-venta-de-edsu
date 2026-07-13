@@ -1,7 +1,6 @@
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local localPlayer = Players.LocalPlayer
 local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
@@ -21,6 +20,8 @@ local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
 -- Variables de Estado
 local autoCompleteActive = false
 local autoV4Active = false
+local currentIslandNumber = 1
+local maxRaidDistance = 450 -- Filtro en studs para ignorar NPCs de otras raids alejadas
 
 -- ==========================================
 -- COMPATIBLE FAST ATTACK ENGINE (H = 20)
@@ -41,15 +42,22 @@ local function executeRealFastAttack(enemy, headObject)
     end)
 end
 
-local function getAliveEnemiesList()
+-- Filtrar enemigos vivos para atacar ÚNICAMENTE los de tu propia Raid local
+local function getMyRaidEnemiesList()
     local enemyList = {}
-    if enemiesFolder then
+    if enemiesFolder and humanoidRootPart then
         for _, object in ipairs(enemiesFolder:GetChildren()) do
             if object:IsA("Model") and object ~= character then
                 local humanoid = object:FindFirstChildOfClass("Humanoid")
                 local head = object:FindFirstChild("Head")
-                if humanoid and humanoid.Health > 0 and head then
-                    table.insert(enemyList, object)
+                local root = object:FindFirstChild("HumanoidRootPart")
+                
+                if humanoid and humanoid.Health > 0 and head and root then
+                    -- VALIDACIÓN CRÍTICA: Ignorar si el NPC pertenece a la raid de otra persona alejada
+                    local distance = (humanoidRootPart.Position - root.Position).Magnitude
+                    if distance <= maxRaidDistance then
+                        table.insert(enemyList, object)
+                    end
                 end
             end
         end
@@ -57,7 +65,24 @@ local function getAliveEnemiesList()
     return enemyList
 end
 
--- Bucle Principal de Combate
+-- Identificar y localizar la siguiente isla correspondiente a TU progreso de Raid
+local function findNextRaidIsland(islandNumber)
+    for _, object in ipairs(Workspace:GetDescendants()) do
+        if object:IsA("BasePart") or object:IsA("Model") then
+            local objName = string.lower(object.Name)
+            -- Filtra nombres clave como "island 2", "island2", "isla 2", "raid island"
+            if (string.find(objName, "island") or string.find(objName, "isla")) and string.find(objName, tostring(islandNumber)) then
+                if object:IsA("Model") then
+                    return object:FindFirstChildOfClass("BasePart") or object.PrimaryPart
+                end
+                return object
+            end
+        end
+    end
+    return nil
+end
+
+-- Bucle Principal de Combate e Islas
 local function runCombatLoop()
     while autoCompleteActive do
         if not character or not character:FindFirstChild("HumanoidRootPart") then
@@ -65,7 +90,7 @@ local function runCombatLoop()
             if character then humanoidRootPart = character:FindFirstChild("HumanoidRootPart") end
         end
 
-        local enemies = getAliveEnemiesList()
+        local enemies = getMyRaidEnemiesList()
         
         if #enemies > 0 then
             for _, enemy in ipairs(enemies) do
@@ -80,7 +105,7 @@ local function runCombatLoop()
                     
                     while elapsedTime < maxTime and enemyHumanoid.Health > 0 and autoCompleteActive do
                         if humanoidRootPart and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-                            -- AJUSTE: 20 unidades de altura para total inmunidad a golpes
+                            -- Altura de seguridad (20 unidades) para evitar hitboxes enemigos
                             humanoidRootPart.CFrame = enemyHead.CFrame * CFrame.new(0, 20, 0)
                         end
                         
@@ -91,31 +116,60 @@ local function runCombatLoop()
                     end
                 end
             end
+        else
+            -- Si no quedan enemigos en tu zona, verificar si el juego anunció el desbloqueo de la siguiente fase
+            local playerGui = localPlayer:FindFirstChild("PlayerGui")
+            local mainGui = playerGui and playerGui:FindFirstChild("Main")
+            local centerMsg = mainGui and mainGui:FindFirstChild("CenterMsg") -- Alerta nativa de Blox Fruits
+            
+            -- Detectar si aparece el texto de nueva isla o si la sala actual está vacía por completo
+            if centerMsg and centerMsg.Visible and (string.find(string.lower(centerMsg.Text), "desbloque") or string.find(string.lower(centerMsg.Text), "island")) then
+                currentIslandNumber = currentIslandNumber + 1
+                local nextIslandPart = findNextRaidIsland(currentIslandNumber)
+                
+                if nextIslandPart and humanoidRootPart then
+                    task.wait(1.0) -- Pausa de estabilidad antes del viaje de fase
+                    humanoidRootPart.CFrame = nextIslandPart.CFrame * CFrame.new(0, 25, 0)
+                    task.wait(2.0) -- Espera de sincronización de mapa
+                end
+            end
         end
         task.wait()
     end
 end
 
 -- ==========================================
--- AUTO V4 ENGINE
+-- CORRECCIÓN: AUTO V4 ENGINE VIA INVENTARIO ("DESPERTAR")
 -- ==========================================
 task.spawn(function()
-    while task.wait(0.5) do
-        if autoV4Active then
-            pcall(function()
-                -- Verificar la existencia de la barra de despertar en la interfaz real de Blox Fruits
-                local playerGui = localPlayer:FindFirstChild("PlayerGui")
-                local mainGui = playerGui and playerGui:FindFirstChild("Main")
-                local awakeningBar = mainGui and mainGui:FindFirstChild("Awakening")
+    while task.wait(1.0) do
+        if autoV4Active and character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            local playerGui = localPlayer:FindFirstChild("PlayerGui")
+            local mainGui = playerGui and playerGui:FindFirstChild("Main")
+            local awakeningBar = mainGui and mainGui:FindFirstChild("Awakening")
+            
+            -- Verificar si el medidor de furia de la interfaz está activo y visible al máximo
+            if awakeningBar and awakeningBar.Visible and humanoid then
+                -- Buscar la herramienta Despertar en la mochila (Backpack) o en la mano
+                local v4Tool = localPlayer.Backpack:FindFirstChild("Despertar") or character:FindFirstChild("Despertar")
                 
-                -- Si está llena o el botón es visible, forzar la activación por hardware virtual
-                if awakeningBar and awakeningBar.Visible then
-                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Y, false, game)
+                if v4Tool then
+                    local currentWeapon = character:FindFirstChildOfClass("Tool")
+                    
+                    -- Intercambio rápido seguro para activar la V4
+                    humanoid:EquipTool(v4Tool)
                     task.wait(0.1)
-                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Y, false, game)
-                    task.wait(5) -- Cooldown para evitar spam de inputs
+                    v4Tool:Activate()
+                    task.wait(0.2)
+                    
+                    -- Regresar al arma de ataque original si existía una
+                    if currentWeapon and currentWeapon.Name ~= "Despertar" then
+                        humanoid:EquipTool(currentWeapon)
+                    end
+                    task.wait(10) -- Evita loops de re-equipamiento continuo
                 end
-            end)
+            end
         end
     end
 end)
@@ -127,7 +181,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
    Name = "Edsusito Dungeon",
-   LoadingTitle = "Cargando Sistema...",
+   LoadingTitle = "Cargando Sistema Anti-Desvío...",
    LoadingSubtitle = "by Edsu",
    ConfigurationSaving = {
       Enabled = false
@@ -138,24 +192,26 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false
 })
 
-local CombatTab = Window:CreateTab("Combate", 4483362458) -- Icono de espada
+local CombatTab = Window:CreateTab("Combate", 4483362458)
 
-CombatTab:CreateSection("Automatización")
+CombatTab:CreateSection("Filtros de Raid Privada")
 
 CombatTab:CreateToggle({
-   Name = "Auto Completar (Matar NPCs)",
+   Name = "Auto Completar (Aislar Mi Raid)",
    CurrentValue = false,
    Flag = "AutoCombatFlag",
    Callback = function(Value)
       autoCompleteActive = Value
       if Value then
+          -- Reiniciar al primer piso/isla al encenderlo
+          currentIslandNumber = 1 
           task.spawn(runCombatLoop)
       end
    end,
 })
 
 CombatTab:CreateToggle({
-   Name = "Auto Activar V4",
+   Name = "Auto Activar V4 (Inventario Despertar)",
    CurrentValue = false,
    Flag = "AutoV4Flag",
    Callback = function(Value)
@@ -164,8 +220,8 @@ CombatTab:CreateToggle({
 })
 
 Rayfield:Notify({
-   Title = "Sistema Listo",
-   Content = "Edsusito Dungeon cargado con éxito en Rayfield.",
+   Title = "Aislamiento Activo",
+   Content = "El filtro ignorará NPCs fuera de un radio de " .. tostring(maxRaidDistance) .. " studs.",
    Duration = 5,
    Image = 4483362458,
 })
