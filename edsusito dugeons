@@ -1,3 +1,8 @@
+-- =============================================================================
+--               ⚔️ EDSUSITO DUNGEON ⚔️ - HIGH PERFORMANCE ENGINE
+-- =============================================================================
+
+-- Servicios Principales de Roblox
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,320 +11,170 @@ local localPlayer = Players.LocalPlayer
 local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
+-- Actualización dinámica del Personaje
 localPlayer.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
 end)
 
--- [VARIABLES REALES DE BLOX FRUITS - NETWORKING]
+-- Variables de Red y Entorno (Blox Fruits Nativo)
 local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
 local registerAttack = netFolder:WaitForChild("RE/RegisterAttack")
 local registerHit = netFolder:WaitForChild("RE/RegisterHit")
 local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
 
--- Variables de Estado Generales
-local autoV4Active = false
-
--- Variables de Estado: MÓDULO DUNGEON
+-- Variables de Control de Estado
 local autoDungeonActive = false
+local currentTarget = nil
 
--- Variables de Estado: MÓDULO RAIDS
-local autoRaidActive = false
-local currentIslandNumber = 1
-local maxRaidDistance = 500 
-local travelingToNextIsland = false -- Evita loops de TP mientras viaja
-
--- ==========================================
--- COMPATIBLE FAST ATTACK ENGINE (H = 20)
--- ==========================================
-local function executeRealFastAttack(enemy, headObject)
-    if not enemy or not headObject then return end
+-- =============================================================================
+-- [FUNCIÓN 1]: FILTRADO Y PRIORIZACIÓN (NPC MÁS CERCANO VIVO)
+-- =============================================================================
+local function GetClosestEnemy()
+    local closestEnemy = nil
+    local shortestDistance = math.huge
+    local currentCharacter = localPlayer.Character
     
-    local tool = character:FindFirstChildOfClass("Tool")
-    if tool then
-        tool:Activate()
+    if not currentCharacter or not currentCharacter:FindFirstChild("HumanoidRootPart") then 
+        return nil 
     end
     
+    local myPos = currentCharacter.HumanoidRootPart.Position
+    local sourceFolder = Workspace:FindFirstChild("Enemies") or enemiesFolder
+    
+    if sourceFolder then
+        local children = sourceFolder:GetChildren()
+        for i = 1, #children do
+            local object = children[i]
+            if object:IsA("Model") and object ~= currentCharacter then
+                local humanoid = object:FindFirstChildOfClass("Humanoid")
+                local root = object:FindFirstChild("HumanoidRootPart") or object:FindFirstChild("Head")
+                
+                if humanoid and humanoid.Health > 0 and root and object.Parent then
+                    local distance = (root.Position - myPos).Magnitude
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestEnemy = object
+                    end
+                end
+            end
+        end
+    end
+    return closestEnemy
+end
+
+-- =============================================================================
+-- [FUNCIÓN 2]: TELEPORTE SEGURO CON FALLBACK ANTIBUGS
+-- =============================================================================
+local function TeleportToEnemy(enemy)
+    if not enemy or not enemy.Parent or not humanoidRootPart then return false end
+    
+    local enemyRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Head")
+    if not enemyRoot then return false end
+    
+    local success, err = pcall(function()
+        -- Posición ideal: 20 bloques exactamente arriba del objetivo
+        humanoidRootPart.CFrame = enemyRoot.CFrame * CFrame.new(0, 20, 0)
+    end)
+    
+    -- FALLBACK: Si falla el teleporte o la instancia es inestable, se asegura en el suelo
+    if not success then
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterDescendantsInstances = {character, enemy}
+        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+        
+        local raycastResult = Workspace:Raycast(enemyRoot.Position, Vector3.new(0, -100, 0), raycastParams)
+        if raycastResult then
+            humanoidRootPart.CFrame = CFrame.new(raycastResult.Position + Vector3.new(0, 3, 0))
+        end
+        return false
+    end
+    return true
+end
+
+-- =============================================================================
+-- [FUNCIÓN 3]: FAST ATTACK MOTOR (0.01s - GOLPES ILIMITADOS)
+-- =============================================================================
+local function AttackEnemy(enemy)
+    if not enemy or not enemy.Parent then return end
+    
+    local enemyHead = enemy:FindFirstChild("Head")
+    local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
+    if not enemyHead or not enemyHumanoid then return end
+    
+    -- Activación de Tool (Espada/Melee/Fruta equipado)
+    local tool = character:FindFirstChildOfClass("Tool")
+    if tool then tool:Activate() end
+    
+    -- Ejecución vía remotos nativos
     pcall(function()
-        local targetsTable = {{enemy, headObject}}
+        local targetsTable = {{enemy, enemyHead}}
         registerAttack:FireServer(0)
-        task.wait(0.01) 
-        registerHit:FireServer(headObject, targetsTable)
+        registerHit:FireServer(enemyHead, targetsTable)
     end)
 end
 
--- ==========================================
--- FILTROS DE ENEMIGOS (GENERAL vs RAID)
--- ==========================================
-local function getAllAliveEnemies()
-    local enemyList = {}
-    if enemiesFolder then
-        for _, object in ipairs(enemiesFolder:GetChildren()) do
-            if object:IsA("Model") and object ~= character then
-                local humanoid = object:FindFirstChildOfClass("Humanoid")
-                local head = object:FindFirstChild("Head")
-                if humanoid and humanoid.Health > 0 and head then
-                    table.insert(enemyList, object)
-                end
-            end
-        end
-    end
-    return enemyList
-end
-
-local function getMyRaidEnemiesList()
-    local enemyList = {}
-    if enemiesFolder and humanoidRootPart then
-        for _, object in ipairs(enemiesFolder:GetChildren()) do
-            if object:IsA("Model") and object ~= character then
-                local humanoid = object:FindFirstChildOfClass("Humanoid")
-                local head = object:FindFirstChild("Head")
-                local root = object:FindFirstChild("HumanoidRootPart")
-                
-                if humanoid and humanoid.Health > 0 and head and root then
-                    local distance = (humanoidRootPart.Position - root.Position).Magnitude
-                    if distance <= maxRaidDistance then
-                        table.insert(enemyList, object)
-                    end
-                end
-            end
-        end
-    end
-    return enemyList
-end
-
--- ==========================================
--- LOCALIZADOR AJUSTADO DE RAIDS ISLANDS
--- ==========================================
-local function findNextRaidIsland(islandNumber)
-    local targetName = "island" .. tostring(islandNumber)
-    
-    for _, object in ipairs(Workspace:GetDescendants()) do
-        if object:IsA("BasePart") or object:IsA("Model") or object:IsA("Folder") then
-            local cleanName = string.gsub(string.lower(object.Name), "%s+", "")
-            
-            if string.find(cleanName, targetName) then
-                if object:IsA("Model") then
-                    if object.PrimaryPart then return object.PrimaryPart end
-                    local part = object:FindFirstChildOfClass("BasePart")
-                    if part then return part end
-                elseif object:IsA("Folder") then
-                    local part = object:FindFirstChildOfClass("BasePart") or object:FindFirstChildOfClass("Model")
-                    if part then
-                        if part:IsA("Model") then return part.PrimaryPart or part:FindFirstChildOfClass("BasePart") end
-                        return part
-                    end
-                elseif object:IsA("BasePart") then
-                    return object
-                end
-            end
-        end
-    end
-    return nil
-end
-
--- ==========================================
--- BUCLE 1: MÓDULO DUNGEON (MATAR A TODOS)
--- ==========================================
-local function runDungeonLoop()
+-- =============================================================================
+-- [FUNCIÓN 4]: ROTACIÓN DINÁMICA DE OBJETIVOS (1 SEGUNDO MAX)
+-- =============================================================================
+local function RotateTargets()
     while autoDungeonActive do
-        if not character or not character:FindFirstChild("HumanoidRootPart") then
-            character = localPlayer.Character
-            if character then humanoidRootPart = character:FindFirstChild("HumanoidRootPart") end
-        end
-
-        local enemies = getAllAliveEnemies()
+        currentTarget = GetClosestEnemy()
         
-        if #enemies > 0 then
-            for _, enemy in ipairs(enemies) do
-                if not autoDungeonActive then break end
-                
-                local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
-                local enemyHead = enemy:FindFirstChild("Head")
-                
-                if enemyHumanoid and enemyHumanoid.Health > 0 and enemyHead then
-                    local maxTime = 0.4    
-                    local elapsedTime = 0
-                    
-                    while elapsedTime < maxTime and enemyHumanoid.Health > 0 and autoDungeonActive do
-                        if humanoidRootPart and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-                            humanoidRootPart.CFrame = enemyHead.CFrame * CFrame.new(0, 20, 0)
-                        end
-                        
-                        executeRealFastAttack(enemy, enemyHead)
-                        
-                        task.wait(0.01) 
-                        elapsedTime = elapsedTime + 0.01
-                    end
-                end
-            end
-        end
-        task.wait()
-    end
-end
-
--- ==========================================
--- BUCLE 2: MÓDULO RAIDS (ESCANEANDO "Isla # despejada!")
--- ==========================================
-local function runRaidLoop()
-    while autoRaidActive do
-        if not character or not character:FindFirstChild("HumanoidRootPart") then
-            character = localPlayer.Character
-            if character then humanoidRootPart = character:FindFirstChild("HumanoidRootPart") end
-        end
-
-        local enemies = getMyRaidEnemiesList()
-        
-        if #enemies > 0 then
-            travelingToNextIsland = false -- Resetear estado si volvieron a aparecer enemigos
+        if currentTarget then
+            local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
+            local timer = 0
             
-            for _, enemy in ipairs(enemies) do
-                if not autoRaidActive then break end
+            -- Ataca y se teletransporta al objetivo actual por un máximo de 1 segundo
+            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 1 do
+                TeleportToEnemy(currentTarget)
+                AttackEnemy(currentTarget)
                 
-                local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
-                local enemyHead = enemy:FindFirstChild("Head")
-                
-                if enemyHumanoid and enemyHumanoid.Health > 0 and enemyHead then
-                    local maxTime = 0.4    
-                    local elapsedTime = 0
-                    
-                    while elapsedTime < maxTime and enemyHumanoid.Health > 0 and autoRaidActive do
-                        if humanoidRootPart and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-                            humanoidRootPart.CFrame = enemyHead.CFrame * CFrame.new(0, 20, 0)
-                        end
-                        
-                        executeRealFastAttack(enemy, enemyHead)
-                        
-                        task.wait(0.01) 
-                        elapsedTime = elapsedTime + 0.01
-                    end
-                end
+                -- Delay estricto de 0.01 segundos exigido para el Fast Attack
+                wait(0.01)
+                timer = timer + 0.01
             end
         else
-            -- CONDICIÓN 1: No hay NPCs vivos en tu rango local.
-            -- CONDICIÓN 2: Escanear el aviso de la captura: "Isla #... despejada!"
-            if not travelingToNextIsland then
-                local playerGui = localPlayer:FindFirstChild("PlayerGui")
-                local mainGui = playerGui and playerGui:FindFirstChild("Main")
-                local centerMsg = mainGui and mainGui:FindFirstChild("CenterMsg")
-                
-                if centerMsg and centerMsg.Visible and string.find(string.lower(centerMsg.Text), "despejada") then
-                    -- Extraer de forma inteligente el número que está al lado de la palabra isla (ej: "Isla #3 despejada!" -> 3)
-                    local text = centerMsg.Text
-                    local islandNumStr = string.match(text, "%d+") -- Captura cualquier dígito continuo en el mensaje
-                    
-                    if islandNumStr then
-                        local clearedIsland = tonumber(islandNumStr)
-                        currentIslandNumber = clearedIsland + 1 -- Tu objetivo real es la siguiente
-                        
-                        travelingToNextIsland = true
-                        local nextIsland = findNextRaidIsland(currentIslandNumber)
-                        
-                        if nextIsland and humanoidRootPart then
-                            task.wait(0.5)
-                            -- Hacer TP seguro 30 unidades arriba de la siguiente isla desbloqueada
-                            humanoidRootPart.CFrame = nextIsland.CFrame * CFrame.new(0, 30, 0)
-                            task.wait(3.0) -- Pausa de estabilidad para que carguen los nuevos NPCs
-                        end
-                    end
-                end
-            end
+            -- Si no hay enemigos en el mapa, descansa para no congelar el ejecutor
+            wait(0.2)
         end
-        task.wait()
     end
 end
 
--- ==========================================
--- AUTO V4 GLOBAL VIA INVENTARIO
--- ==========================================
-task.spawn(function()
-    while task.wait(1.0) do
-        if autoV4Active and character then
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            local playerGui = localPlayer:FindFirstChild("PlayerGui")
-            local mainGui = playerGui and playerGui:FindFirstChild("Main")
-            local awakeningBar = mainGui and mainGui:FindFirstChild("Awakening")
-            
-            if awakeningBar and awakeningBar.Visible and humanoid then
-                local v4Tool = localPlayer.Backpack:FindFirstChild("Despertar") or character:FindFirstChild("Despertar")
-                
-                if v4Tool then
-                    local currentWeapon = character:FindFirstChildOfClass("Tool")
-                    
-                    humanoid:EquipTool(v4Tool)
-                    task.wait(0.1)
-                    v4Tool:Activate()
-                    task.wait(0.2)
-                    
-                    if currentWeapon and currentWeapon.Name ~= "Despertar" then
-                        humanoid:EquipTool(currentWeapon)
-                    end
-                    task.wait(10)
-                end
-            end
-        end
-    end
-end)
-
--- ==========================================
--- CARGA DE LIBRERÍA RAYFIELD UI
--- ==========================================
+-- =============================================================================
+-- INTERFAZ GRÁFICA (RAYFIELD UI COMPATIBLE)
+-- =============================================================================
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Edsusito Dungeon & Raids",
-   LoadingTitle = "Cargando Detector de Mensajes...",
-   LoadingSubtitle = "by Edsu",
-   ConfigurationSaving = { Enabled = false },
-   Discord = { Enabled = false },
-   KeySystem = false
+    Name = "⚔️ Edsusito Dungeon ⚔️",
+    LoadingTitle = "Iniciando Sistema de Rotación...",
+    LoadingSubtitle = "By Edsu",
+    ConfigurationSaving = { Enabled = false },
+    Discord = { Enabled = false },
+    KeySystem = false
 })
 
--- PESTAÑA 1: DUNGEON
 local DungeonTab = Window:CreateTab("Dungeon", 4483362458)
-DungeonTab:CreateSection("Modo Dungeon Clásico")
+DungeonTab:CreateSection("Control Principal")
 
 DungeonTab:CreateToggle({
-   Name = "Auto Completar Dungeon (Todos los NPCs)",
-   CurrentValue = false,
-   Flag = "AutoDungeonFlag",
-   Callback = function(Value)
-      autoDungeonActive = Value
-      if Value then
-          autoRaidActive = false
-          task.spawn(runDungeonLoop)
-      end
-   end,
-})
-
--- PESTAÑA 2: RAIDS
-local RaidTab = Window:CreateTab("Raids", 4483362458)
-RaidTab:CreateSection("Modo Raid Sincronizado")
-
-RaidTab:CreateToggle({
-   Name = "Auto Completar Raid (Doble Sincronización)",
-   CurrentValue = false,
-   Flag = "AutoRaidFlag",
-   Callback = function(Value)
-      autoRaidActive = Value
-      if Value then
-          autoDungeonActive = false
-          currentIslandNumber = 1 
-          travelingToNextIsland = false
-          task.spawn(runRaidLoop)
-      end
-   end,
-})
-
--- CONFIGURACIÓN GLOBAL
-local SettingsTab = Window:CreateTab("Configuración", 4483362458)
-SettingsTab:CreateSection("Poder Supremo")
-
-SettingsTab:CreateToggle({
-   Name = "Auto Activar V4 (Inventario Despertar)",
-   CurrentValue = false,
-   Flag = "GlobalAutoV4Flag",
-   Callback = function(Value)
-      autoV4Active = Value
-   end,
+    Name = "Auto Completar",
+    CurrentValue = false,
+    Flag = "EdsuAutoDungeonFlag",
+    Callback = function(Value)
+        autoDungeonActive = Value
+        if Value then
+            -- Compatibilidad nativa absoluta en Xeno y exploiters antiguos (Evitamos task.spawn)
+            coroutine.wrap(RotateTargets)()
+        else
+            currentTarget = nil
+            Rayfield:Notify({
+                Title = "⚔️ Edsusito Dungeon ⚔️",
+                Content = "Ciclo de rotación pausado con éxito.",
+                Duration = 2,
+                Image = 4483362458,
+            })
+        end
+    end,
 })
