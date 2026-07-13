@@ -1,0 +1,178 @@
+-- ⚔️ Edsusito Dungeons ⚔️
+-- Auto Dungeon con Fast Attack dinámico
+-- Compatible con Xeno, Solara, Madium, Synapse y otros ejecutores de PC
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+
+-- Variables
+local AttackMode = "Sword"
+local AutoDungeonEnabled = false
+local currentIndex = 1
+local FAST_ATTACK_RANGE = 80
+
+-- Detectar arma equipada
+local function HasWeaponEquipped()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if AttackMode == "Sword" then
+        return tool and tool.Name:lower():find("sword")
+    elseif AttackMode == "Combat" then
+        return true
+    end
+    return false
+end
+
+-- Obtener NPCs vivos cercanos
+local function GetAllTargets()
+    local targets = {}
+    for _, npc in pairs(workspace:GetChildren()) do
+        local hum = npc:FindFirstChild("Humanoid")
+        local hrp = npc:FindFirstChild("HumanoidRootPart")
+        if hum and hrp and hum.Health > 0 then
+            local dist = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+            if dist <= FAST_ATTACK_RANGE then
+                table.insert(targets, {npc, npc:FindFirstChild("Head")})
+            end
+        end
+    end
+    return targets
+end
+
+-- Ataque dinámico con rotación cada 0.4s
+local function AutoTargetAttack()
+    if not HasWeaponEquipped() then return end
+    local targets = GetAllTargets()
+    if not targets or #targets == 0 then return end
+
+    if #targets == 1 then
+        local npc = targets[1][1]
+        local head = targets[1][2]
+        if npc and head then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = npc.HumanoidRootPart.CFrame + Vector3.new(0,2,0)
+            game:GetService("ReplicatedStorage").RigControllerEvent:FireServer("attack", "m1")
+            game:GetService("ReplicatedStorage").RigControllerEvent:FireServer("hit", head)
+        end
+        return
+    end
+
+    currentIndex = currentIndex + 1
+    if currentIndex > #targets then
+        currentIndex = 1
+    end
+
+    local npc = targets[currentIndex][1]
+    local head = targets[currentIndex][2]
+    if npc and head then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = npc.HumanoidRootPart.CFrame + Vector3.new(0,2,0)
+        game:GetService("ReplicatedStorage").RigControllerEvent:FireServer("attack", "m1")
+        game:GetService("ReplicatedStorage").RigControllerEvent:FireServer("hit", head)
+    end
+end
+
+-- Buscar puerta/portal
+local function FindDoor()
+    local doorNames = {"Exit","Gate","Portal","Barrier"}
+    for _, name in pairs(doorNames) do
+        local obj = workspace:FindFirstChild(name)
+        if obj and obj:IsA("BasePart") then
+            return obj
+        end
+    end
+    for _, obj in pairs(workspace:GetChildren()) do
+        if obj:IsA("BasePart") and obj.Size.Magnitude > 20 then
+            return obj
+        end
+    end
+    return nil
+end
+
+-- Teletransportarse a la puerta
+local function GoToDoor()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local door = FindDoor()
+    if hrp and door then
+        hrp.CFrame = door.CFrame + Vector3.new(0,5,0)
+    end
+end
+
+-- Bucle principal
+task.spawn(function()
+    while true do
+        task.wait(0.4)
+        if AutoDungeonEnabled then
+            local targets = GetAllTargets()
+            if #targets > 0 then
+                AutoTargetAttack()
+            else
+                GoToDoor()
+            end
+        end
+    end
+end)
+
+-- Interfaz Rayfield
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "⚔️ Edsusito Dungeons ⚔️",
+   LoadingTitle = "🌌 Auto Dungeon 🌌",
+   LoadingSubtitle = "🔥 by Edsusito 🔥",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "EdsusitoScripts",
+      FileName = "EdsusitoDungeonConfig"
+   },
+   KeySystem = false,
+})
+
+-- Tab de ataque
+local AttackTab = Window:CreateTab("🗡️ Modo de Ataque", 4483362458)
+
+AttackTab:CreateButton({
+   Name = "⚔️ Espada",
+   Callback = function()
+      AttackMode = "Sword"
+   end,
+})
+
+AttackTab:CreateButton({
+   Name = "🥊 Combate",
+   Callback = function()
+      AttackMode = "Combat"
+   end,
+})
+
+-- Tab de Auto Dungeon
+local DungeonTab = Window:CreateTab("🏰 Dungeon", 4483362458)
+
+DungeonTab:CreateToggle({
+   Name = "🚀 Auto Dungeon",
+   CurrentValue = false,
+   Flag = "AutoDungeon",
+   Callback = function(Value)
+      AutoDungeonEnabled = Value
+   end,
+})
+
+-- Keybind para abrir/cerrar con N
+Window:CreateKeybind({
+   Name = "📂 Abrir/Cerrar Panel",
+   CurrentKeybind = "N",
+   HoldToInteract = false,
+   Flag = "ToggleUI",
+   Callback = function()
+      Rayfield:ToggleUI()
+   end,
+})
+
+-- Botón extra para móviles
+DungeonTab:CreateButton({
+   Name = "📱 Abrir/Cerrar en Celular",
+   Callback = function()
+      Rayfield:ToggleUI()
+   end,
+})
