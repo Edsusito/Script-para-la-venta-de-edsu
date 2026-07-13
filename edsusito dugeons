@@ -1,5 +1,5 @@
 -- ⚔️ Edsusito Dungeons ⚔️
--- Auto Dungeon con Fast Attack dinámico
+-- Auto Dungeon + Fast Attack dinámico
 -- Compatible con Xeno, Solara, Madium, Synapse y otros ejecutores de PC
 
 local Players = game:GetService("Players")
@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Variables
 local AttackMode = "Sword"
+local FastAttackEnabled = false
 local AutoDungeonEnabled = false
 local currentIndex = 1
 local FAST_ATTACK_RANGE = 80
@@ -43,6 +44,7 @@ end
 
 -- Función: ataque dinámico con rotación cada 0.4s
 local function AutoTargetAttack()
+    if not FastAttackEnabled then return end
     if not HasWeaponEquipped() then return end
     local targets = GetAllTargets()
     if not targets or #targets == 0 then return end
@@ -51,7 +53,7 @@ local function AutoTargetAttack()
         local npc = targets[1][1]
         local head = targets[1][2]
         if npc and head then
-            -- TP flotando encima del NPC (sobre la cabeza)
+            -- TP flotando encima del NPC
             LocalPlayer.Character.HumanoidRootPart.CFrame = head.CFrame + Vector3.new(0,6,0)
             pcall(function()
                 ReplicatedStorage.RigControllerEvent:FireServer("attack", "m1")
@@ -69,7 +71,7 @@ local function AutoTargetAttack()
     local npc = targets[currentIndex][1]
     local head = targets[currentIndex][2]
     if npc and head then
-        -- TP flotando encima del NPC (sobre la cabeza)
+        -- TP flotando encima del NPC
         LocalPlayer.Character.HumanoidRootPart.CFrame = head.CFrame + Vector3.new(0,6,0)
         pcall(function()
             ReplicatedStorage.RigControllerEvent:FireServer("attack", "m1")
@@ -121,6 +123,8 @@ task.spawn(function()
             else
                 GoToDoor()
             end
+        elseif FastAttackEnabled then
+            AutoTargetAttack()
         end
     end
 end)
@@ -140,27 +144,21 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false,
 })
 
--- Tab de ataque
-local AttackTab = Window:CreateTab("🗡️ Modo de Ataque", 4483362458)
+-- Un solo Tab con todo
+local MainTab = Window:CreateTab("🏰 Dungeon Control", 4483362458)
 
-AttackTab:CreateButton({
-   Name = "⚔️ Espada",
-   Callback = function()
-      AttackMode = "Sword"
+-- Toggle Fast Attack
+MainTab:CreateToggle({
+   Name = "⚔️ Fast Attack",
+   CurrentValue = false,
+   Flag = "FastAttack",
+   Callback = function(Value)
+      FastAttackEnabled = Value
    end,
 })
 
-AttackTab:CreateButton({
-   Name = "🥊 Combate",
-   Callback = function()
-      AttackMode = "Combat"
-   end,
-})
-
--- Tab de Auto Dungeon
-local DungeonTab = Window:CreateTab("🏰 Dungeon", 4483362458)
-
-DungeonTab:CreateToggle({
+-- Toggle Auto Dungeon
+MainTab:CreateToggle({
    Name = "🚀 Auto Dungeon",
    CurrentValue = false,
    Flag = "AutoDungeon",
@@ -181,7 +179,7 @@ Window:CreateKeybind({
 })
 
 -- Botón extra para móviles
-DungeonTab:CreateButton({
+MainTab:CreateButton({
    Name = "📱 Abrir/Cerrar en Celular",
    Callback = function()
       Rayfield:ToggleUI()
