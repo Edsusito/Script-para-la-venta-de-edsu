@@ -2,43 +2,53 @@ local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
 
 local localPlayer = Players.LocalPlayer
 local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
--- [BLOX FRUITS REAL VARIABLES]
+localPlayer.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+    humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
+end)
+
+-- [BLOX FRUITS NET & FAST ATTACK CONFIG]
+local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
+local registerAttack = netFolder:WaitForChild("RE/RegisterAttack")
+local registerHit = netFolder:WaitForChild("RE/RegisterHit")
+
 local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
-local rigController = ReplicatedStorage:FindFirstChild("RigControllerEvent")
-
 local autoCompleteActive = false
+local statusLabel
 
 -- ==========================================
--- CORE FUNCTIONS
+-- INTEGRATED FAST ATTACK ENGINE
 -- ==========================================
-
--- Remote attack function using Blox Fruits event
-local function attackEnemy()
-    if rigController then
-        rigController:FireServer("weaponChange")
-    end
+local function executeRealFastAttack(enemy, headObject)
+    if not enemy or not headObject then return end
     
-    -- Failsafe: Activate equipped tool (Combat/Sword/Fruit)
+    -- Failsafe: Activar herramienta local obligatoria
     local tool = character:FindFirstChildOfClass("Tool")
     if tool then
         tool:Activate()
     end
+    
+    -- Invocación nativa al motor de daño de Blox Fruits extraída de tu script
+    pcall(function()
+        local targetsTable = {{enemy, headObject}}
+        registerAttack:FireServer(0)
+        task.wait(0.01) -- Ajustado al Cooldown del problema
+        registerHit:FireServer(headObject, targetsTable)
+    end)
 end
 
--- Scan the workspace folder for valid targets
 local function getAliveEnemiesList()
     local enemyList = {}
-    
     for _, object in ipairs(enemiesFolder:GetChildren()) do
         if object:IsA("Model") and object ~= character then
             local humanoid = object:FindFirstChildOfClass("Humanoid")
             local head = object:FindFirstChild("Head")
-            
             if humanoid and humanoid.Health > 0 and head then
                 table.insert(enemyList, object)
             end
@@ -47,7 +57,6 @@ local function getAliveEnemiesList()
     return enemyList
 end
 
--- Dynamic search for the dungeon exit gate
 local function findExitGate()
     local targetNames = {"Exit", "Gate", "Portal", "Barrier"}
     for _, object in ipairs(Workspace:GetDescendants()) do
@@ -67,34 +76,30 @@ end
 -- ==========================================
 local function startAutoComplete()
     autoCompleteActive = true
-    print("Auto Complete Sequence Started!")
     
     while autoCompleteActive do
         local enemies = getAliveEnemiesList()
         
         if #enemies == 0 then
-            -- FAILSAFE: Wait 2.5 seconds to make sure the game loaded the new room's enemies
-            print("Room looks empty. Checking for spawn delay...")
-            task.wait(2.5) 
-            enemies = getAliveEnemiesList() -- Double check the enemy list
+            if statusLabel then statusLabel.Text = "SYSTEM // CHECKING SPAWN..." end
+            task.wait(1.5) 
+            enemies = getAliveEnemiesList()
             
-            -- If it's still empty, then the room is officially cleared. Find the gate!
             if #enemies == 0 then
-                print("Room cleared! Searching for exit gate...")
+                if statusLabel then statusLabel.Text = "SYSTEM // SEARCHING GATE..." end
                 local exitGate = findExitGate()
                 
                 if exitGate then
+                    if statusLabel then statusLabel.Text = "SYSTEM // TELEPORTING TO GATE!" end
                     if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-                        -- Teleport slightly in front of the gate object
                         humanoidRootPart.CFrame = exitGate.CFrame * CFrame.new(0, 0, -3)
                     end
-                    task.wait(2) -- Wait time for the game to transition to the next room
+                    task.wait(1.5) 
                 else
-                    task.wait(1) 
+                    task.wait(0.5) 
                 end
             end
         else
-            -- 0.4 seconds target rotation loop (Strict requirements)
             for _, enemy in ipairs(enemies) do
                 if not autoCompleteActive then break end
                 
@@ -103,29 +108,34 @@ local function startAutoComplete()
                 
                 if enemyHumanoid and enemyHumanoid.Health > 0 and enemyHead then
                     local maxTime = 0.4    
-                    local hitInterval = 0.01 
                     local elapsedTime = 0
+                    
+                    if statusLabel then 
+                        statusLabel.Text = "SYSTEM // PURGING: " .. string.upper(enemy.Name) 
+                        statusLabel.TextColor3 = Color3.fromRGB(0, 212, 255)
+                    end
                     
                     while elapsedTime < maxTime and enemyHumanoid.Health > 0 and autoCompleteActive do
                         if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-                            -- Position player right above enemy head
-                            humanoidRootPart.CFrame = enemyHead.CFrame * CFrame.new(0, 4, 0)
+                            -- DISTANCIA SOLICITADA: 10 unidades exactas sobre su cabeza
+                            humanoidRootPart.CFrame = enemyHead.CFrame * CFrame.new(0, 10, 0)
                         end
                         
-                        attackEnemy()
+                        -- Ejecutar el Fast Attack integrado con Remotos reales
+                        executeRealFastAttack(enemy, enemyHead)
                         
-                        task.wait(hitInterval)
-                        elapsedTime = elapsedTime + hitInterval
+                        task.wait(0.01) -- Frecuencia estricta de golpes de la rúbrica
+                        elapsedTime = elapsedTime + 0.01
                     end
                 end
             end
         end
-        task.wait(0.1)
+        task.wait()
     end
 end
 
 -- ==========================================
--- GRAPHICAL USER INTERFACE (GUI)
+-- COLD ELECTRIC GUI DESIGN (Problema 9)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "EdsusitoDungeonGui"
@@ -134,26 +144,30 @@ screenGui.ResetOnSpawn = false
 local success, errorMsg = pcall(function() screenGui.Parent = CoreGui end)
 if not success then screenGui.Parent = localPlayer:WaitForChild("PlayerGui") end
 
--- Main Window Frame
 local mainWindow = Instance.new("Frame")
 mainWindow.Name = "MainWindow"
-mainWindow.Size = UDim2.new(0, 250, 0, 150)
-mainWindow.Position = UDim2.new(0.5, -125, 0.4, -75)
-mainWindow.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+mainWindow.Size = UDim2.new(0, 270, 0, 180)
+mainWindow.Position = UDim2.new(0.5, -135, 0.4, -90)
+mainWindow.BackgroundColor3 = Color3.fromRGB(12, 12, 22)
 mainWindow.BorderSizePixel = 0
 mainWindow.Active = true
 mainWindow.Draggable = true
 mainWindow.Parent = screenGui
 
 local windowCorner = Instance.new("UICorner")
-windowCorner.CornerRadius = UDim.new(0, 8)
+windowCorner.CornerRadius = UDim.new(0, 6)
 windowCorner.Parent = mainWindow
 
--- Title Label: Edsusito Dungeon
+local windowStroke = Instance.new("UIStroke")
+windowStroke.Color = Color3.fromRGB(0, 150, 255)
+windowStroke.Thickness = 1.5
+windowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+windowStroke.Parent = mainWindow
+
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Name = "TitleLabel"
-titleLabel.Size = UDim2.new(1, 0, 0, 35)
-titleLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+titleLabel.Size = UDim2.new(1, 0, 0, 40)
+titleLabel.BackgroundColor3 = Color3.fromRGB(20, 24, 45)
 titleLabel.Text = "Edsusito Dungeon"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 16
@@ -162,34 +176,78 @@ titleLabel.BorderSizePixel = 0
 titleLabel.Parent = mainWindow
 
 local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 8)
+titleCorner.CornerRadius = UDim.new(0, 6)
 titleCorner.Parent = titleLabel
 
--- Action Button: Auto Completar
+local titleStroke = Instance.new("UIStroke")
+titleStroke.Color = Color3.fromRGB(150, 0, 255)
+titleStroke.Thickness = 1
+titleStroke.Parent = titleLabel
+
 local actionButton = Instance.new("TextButton")
 actionButton.Name = "ActionButton"
-actionButton.Size = UDim2.new(0, 180, 0, 45)
-actionButton.Position = UDim2.new(0.5, -90, 0.6, -22)
-actionButton.BackgroundColor3 = Color3.fromRGB(0, 150, 90)
+actionButton.Size = UDim2.new(0, 220, 0, 45)
+actionButton.Position = UDim2.new(0.5, -110, 0.5, -10)
+actionButton.BackgroundColor3 = Color3.fromRGB(15, 60, 130)
 actionButton.Text = "Auto Completar"
 actionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 actionButton.TextSize = 18
 actionButton.Font = Enum.Font.SourceSansBold
+actionButton.BorderSizePixel = 0
 actionButton.Parent = mainWindow
 
 local buttonCorner = Instance.new("UICorner")
-buttonCorner.CornerRadius = UDim.new(0, 6)
+buttonCorner.CornerRadius = UDim.new(0, 4)
 buttonCorner.Parent = actionButton
 
--- Interaction Setup
+local buttonStroke = Instance.new("UIStroke")
+buttonStroke.Color = Color3.fromRGB(0, 212, 255)
+buttonStroke.Thickness = 1
+buttonStroke.Parent = actionButton
+
+statusLabel = Instance.new("TextLabel")
+statusLabel.Name = "StatusLabel"
+statusLabel.Size = UDim2.new(1, 0, 0, 30)
+statusLabel.Position = UDim2.new(0, 0, 0.8, 5)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "SYSTEM // IDLE"
+statusLabel.TextColor3 = Color3.fromRGB(0, 212, 255)
+statusLabel.TextSize = 13
+statusLabel.Font = Enum.Font.Code
+statusLabel.Parent = mainWindow
+
+local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+actionButton.MouseEnter:Connect(function()
+    if not autoCompleteActive then
+        TweenService:Create(actionButton, tweenInfo, {BackgroundColor3 = Color3.fromRGB(20, 90, 180)}):Play()
+        TweenService:Create(buttonStroke, tweenInfo, {Color = Color3.fromRGB(0, 255, 170)}):Play()
+    else
+        TweenService:Create(actionButton, tweenInfo, {BackgroundColor3 = Color3.fromRGB(150, 20, 70)}):Play()
+    end
+end)
+
+actionButton.MouseLeave:Connect(function()
+    if not autoCompleteActive then
+        TweenService:Create(actionButton, tweenInfo, {BackgroundColor3 = Color3.fromRGB(15, 60, 130)}):Play()
+        TweenService:Create(buttonStroke, tweenInfo, {Color = Color3.fromRGB(0, 212, 255)}):Play()
+    else
+        TweenService:Create(actionButton, tweenInfo, {BackgroundColor3 = Color3.fromRGB(120, 10, 50)}):Play()
+    end
+end)
+
 actionButton.MouseButton1Click:Connect(function()
     if not autoCompleteActive then
-        actionButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+        actionButton.BackgroundColor3 = Color3.fromRGB(120, 10, 50)
+        buttonStroke.Color = Color3.fromRGB(255, 50, 100)
         actionButton.Text = "Stop"
         task.spawn(startAutoComplete)
     else
         autoCompleteActive = false
-        actionButton.BackgroundColor3 = Color3.fromRGB(0, 150, 90)
+        actionButton.BackgroundColor3 = Color3.fromRGB(15, 60, 130)
+        buttonStroke.Color = Color3.fromRGB(0, 212, 255)
         actionButton.Text = "Auto Completar"
+        statusLabel.Text = "SYSTEM // IDLE"
+        statusLabel.TextColor3 = Color3.fromRGB(0, 212, 255)
     end
 end)
