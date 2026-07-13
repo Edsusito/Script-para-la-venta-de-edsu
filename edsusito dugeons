@@ -8,12 +8,13 @@ local localPlayer = Players.LocalPlayer
 local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
+-- Mantener el cuerpo actualizado pase lo que pase
 localPlayer.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
 end)
 
--- [BLOX FRUITS NET & FAST ATTACK CONFIG]
+-- [VARIABLES REALES DE BLOX FRUITS - NETWORKING]
 local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
 local registerAttack = netFolder:WaitForChild("RE/RegisterAttack")
 local registerHit = netFolder:WaitForChild("RE/RegisterHit")
@@ -23,52 +24,63 @@ local autoCompleteActive = false
 local statusLabel
 
 -- ==========================================
--- INTEGRATED FAST ATTACK ENGINE
+-- COMPATIBLE FAST ATTACK ENGINE
 -- ==========================================
 local function executeRealFastAttack(enemy, headObject)
     if not enemy or not headObject then return end
     
-    -- Failsafe: Activar herramienta local obligatoria
     local tool = character:FindFirstChildOfClass("Tool")
     if tool then
         tool:Activate()
     end
     
-    -- Invocación nativa al motor de daño de Blox Fruits extraída de tu script
     pcall(function()
         local targetsTable = {{enemy, headObject}}
         registerAttack:FireServer(0)
-        task.wait(0.01) -- Ajustado al Cooldown del problema
+        task.wait(0.01) 
         registerHit:FireServer(headObject, targetsTable)
     end)
 end
 
 local function getAliveEnemiesList()
     local enemyList = {}
-    for _, object in ipairs(enemiesFolder:GetChildren()) do
-        if object:IsA("Model") and object ~= character then
-            local humanoid = object:FindFirstChildOfClass("Humanoid")
-            local head = object:FindFirstChild("Head")
-            if humanoid and humanoid.Health > 0 and head then
-                table.insert(enemyList, object)
+    if enemiesFolder then
+        for _, object in ipairs(enemiesFolder:GetChildren()) do
+            if object:IsA("Model") and object ~= character then
+                local humanoid = object:FindFirstChildOfClass("Humanoid")
+                local head = object:FindFirstChild("Head")
+                if humanoid and humanoid.Health > 0 and head then
+                    table.insert(enemyList, object)
+                end
             end
         end
     end
     return enemyList
 end
 
-local function findExitGate()
-    local targetNames = {"Exit", "Gate", "Portal", "Barrier"}
+-- ==========================================
+-- SMART FLOOR TRACKER (SELECCIÓN POR CERCANÍA)
+-- ==========================================
+local function findClosestFloor()
+    if not humanoidRootPart then return nil end
+    
+    local closestPart = nil
+    local shortestDistance = math.huge -- Infinito inicial
+    
     for _, object in ipairs(Workspace:GetDescendants()) do
         if object:IsA("BasePart") then
-            for _, name in ipairs(targetNames) do
-                if object.Name == name then
-                    return object
+            -- Buscar cualquier coincidencia con la palabra floor
+            if string.find(string.lower(object.Name), "floor") then
+                local distance = (object.Position - humanoidRootPart.Position).Magnitude
+                -- Seleccionar estrictamente el que esté más cerca de nuestra posición actual
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestPart = object
                 end
             end
         end
     end
-    return nil
+    return closestPart
 end
 
 -- ==========================================
@@ -78,25 +90,33 @@ local function startAutoComplete()
     autoCompleteActive = true
     
     while autoCompleteActive do
+        -- Forzar re-enganche de seguridad en cada ciclo
+        if not character or not character:FindFirstChild("HumanoidRootPart") then
+            character = localPlayer.Character
+            if character then humanoidRootPart = character:FindFirstChild("HumanoidRootPart") end
+        end
+
         local enemies = getAliveEnemiesList()
         
         if #enemies == 0 then
-            if statusLabel then statusLabel.Text = "SYSTEM // CHECKING SPAWN..." end
-            task.wait(1.5) 
+            if statusLabel then statusLabel.Text = "SYSTEM // WAVE CLEARED!" end
+            task.wait(1.0) 
+            
             enemies = getAliveEnemiesList()
             
             if #enemies == 0 then
-                if statusLabel then statusLabel.Text = "SYSTEM // SEARCHING GATE..." end
-                local exitGate = findExitGate()
+                if statusLabel then statusLabel.Text = "SYSTEM // SCANNING CLOSEST FLOOR..." end
                 
-                if exitGate then
-                    if statusLabel then statusLabel.Text = "SYSTEM // TELEPORTING TO GATE!" end
-                    if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-                        humanoidRootPart.CFrame = exitGate.CFrame * CFrame.new(0, 0, -3)
-                    end
-                    task.wait(1.5) 
+                -- Buscar el piso correspondiente a tu Stage actual por cercanía
+                local currentFloorPart = findClosestFloor()
+                if currentFloorPart and humanoidRootPart then
+                    if statusLabel then statusLabel.Text = "SYSTEM // TARGETING: " .. string.upper(currentFloorPart.Name) end
+                    
+                    -- Teletransporte seguro al centro del piso de tu stage actual
+                    humanoidRootPart.CFrame = currentFloorPart.CFrame * CFrame.new(0, 3, 0)
+                    task.wait(2.0) 
                 else
-                    task.wait(0.5) 
+                    task.wait(0.5)
                 end
             end
         else
@@ -116,15 +136,14 @@ local function startAutoComplete()
                     end
                     
                     while elapsedTime < maxTime and enemyHumanoid.Health > 0 and autoCompleteActive do
-                        if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-                            -- DISTANCIA SOLICITADA: 10 unidades exactas sobre su cabeza
+                        if humanoidRootPart and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
+                            -- Mantener altura de seguridad (10 unidades) sobre el enemigo actual
                             humanoidRootPart.CFrame = enemyHead.CFrame * CFrame.new(0, 10, 0)
                         end
                         
-                        -- Ejecutar el Fast Attack integrado con Remotos reales
                         executeRealFastAttack(enemy, enemyHead)
                         
-                        task.wait(0.01) -- Frecuencia estricta de golpes de la rúbrica
+                        task.wait(0.01) 
                         elapsedTime = elapsedTime + 0.01
                     end
                 end
@@ -135,14 +154,18 @@ local function startAutoComplete()
 end
 
 -- ==========================================
--- COLD ELECTRIC GUI DESIGN (Problema 9)
+-- COLD ELECTRIC GUI DESIGN (COMPATIBLE)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "EdsusitoDungeonGui"
 screenGui.ResetOnSpawn = false
 
-local success, errorMsg = pcall(function() screenGui.Parent = CoreGui end)
-if not success then screenGui.Parent = localPlayer:WaitForChild("PlayerGui") end
+local protectedStorage = pcall(function() 
+    screenGui.Parent = CoreGui 
+end)
+if not protectedStorage then 
+    screenGui.Parent = localPlayer:WaitForChild("PlayerGui") 
+end
 
 local mainWindow = Instance.new("Frame")
 mainWindow.Name = "MainWindow"
@@ -210,7 +233,7 @@ statusLabel.Name = "StatusLabel"
 statusLabel.Size = UDim2.new(1, 0, 0, 30)
 statusLabel.Position = UDim2.new(0, 0, 0.8, 5)
 statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "SYSTEM // IDLE"
+statusLabel.Text = "SYSTEM // READY"
 statusLabel.TextColor3 = Color3.fromRGB(0, 212, 255)
 statusLabel.TextSize = 13
 statusLabel.Font = Enum.Font.Code
