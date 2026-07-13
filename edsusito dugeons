@@ -51,7 +51,8 @@ local function AutoTargetAttack()
         local npc = targets[1][1]
         local head = targets[1][2]
         if npc and head then
-            LocalPlayer.Character.HumanoidRootPart.CFrame = npc.HumanoidRootPart.CFrame + Vector3.new(0,2,0)
+            -- TP flotando encima del NPC (sobre la cabeza)
+            LocalPlayer.Character.HumanoidRootPart.CFrame = head.CFrame + Vector3.new(0,6,0)
             pcall(function()
                 ReplicatedStorage.RigControllerEvent:FireServer("attack", "m1")
                 ReplicatedStorage.RigControllerEvent:FireServer("hit", head)
@@ -68,7 +69,8 @@ local function AutoTargetAttack()
     local npc = targets[currentIndex][1]
     local head = targets[currentIndex][2]
     if npc and head then
-        LocalPlayer.Character.HumanoidRootPart.CFrame = npc.HumanoidRootPart.CFrame + Vector3.new(0,2,0)
+        -- TP flotando encima del NPC (sobre la cabeza)
+        LocalPlayer.Character.HumanoidRootPart.CFrame = head.CFrame + Vector3.new(0,6,0)
         pcall(function()
             ReplicatedStorage.RigControllerEvent:FireServer("attack", "m1")
             ReplicatedStorage.RigControllerEvent:FireServer("hit", head)
