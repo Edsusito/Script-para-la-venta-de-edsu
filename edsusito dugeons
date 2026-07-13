@@ -17,9 +17,14 @@ local registerAttack = netFolder:WaitForChild("RE/RegisterAttack")
 local registerHit = netFolder:WaitForChild("RE/RegisterHit")
 local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
 
--- Variables de Estado
-local autoCompleteActive = false
+-- Variables de Estado Generales
 local autoV4Active = false
+
+-- Variables de Estado: MÓDULO DUNGEON
+local autoDungeonActive = false
+
+-- Variables de Estado: MÓDULO RAIDS
+local autoRaidActive = false
 local currentIslandNumber = 1
 local maxRaidDistance = 450 -- Filtro en studs para ignorar NPCs de otras raids alejadas
 
@@ -42,7 +47,25 @@ local function executeRealFastAttack(enemy, headObject)
     end)
 end
 
--- Filtrar enemigos vivos para atacar ÚNICAMENTE los de tu propia Raid local
+-- ==========================================
+-- FILTROS DE ENEMIGOS (GENERAL vs RAID)
+-- ==========================================
+local function getAllAliveEnemies()
+    local enemyList = {}
+    if enemiesFolder then
+        for _, object in ipairs(enemiesFolder:GetChildren()) do
+            if object:IsA("Model") and object ~= character then
+                local humanoid = object:FindFirstChildOfClass("Humanoid")
+                local head = object:FindFirstChild("Head")
+                if humanoid and humanoid.Health > 0 and head then
+                    table.insert(enemyList, object)
+                end
+            end
+        end
+    end
+    return enemyList
+end
+
 local function getMyRaidEnemiesList()
     local enemyList = {}
     if enemiesFolder and humanoidRootPart then
@@ -53,7 +76,7 @@ local function getMyRaidEnemiesList()
                 local root = object:FindFirstChild("HumanoidRootPart")
                 
                 if humanoid and humanoid.Health > 0 and head and root then
-                    -- VALIDACIÓN CRÍTICA: Ignorar si el NPC pertenece a la raid de otra persona alejada
+                    -- VALIDACIÓN: Ignorar NPCs de otras personas en el servidor
                     local distance = (humanoidRootPart.Position - root.Position).Magnitude
                     if distance <= maxRaidDistance then
                         table.insert(enemyList, object)
@@ -65,12 +88,10 @@ local function getMyRaidEnemiesList()
     return enemyList
 end
 
--- Identificar y localizar la siguiente isla correspondiente a TU progreso de Raid
 local function findNextRaidIsland(islandNumber)
     for _, object in ipairs(Workspace:GetDescendants()) do
         if object:IsA("BasePart") or object:IsA("Model") then
             local objName = string.lower(object.Name)
-            -- Filtra nombres clave como "island 2", "island2", "isla 2", "raid island"
             if (string.find(objName, "island") or string.find(objName, "isla")) and string.find(objName, tostring(islandNumber)) then
                 if object:IsA("Model") then
                     return object:FindFirstChildOfClass("BasePart") or object.PrimaryPart
@@ -82,9 +103,52 @@ local function findNextRaidIsland(islandNumber)
     return nil
 end
 
--- Bucle Principal de Combate e Islas
-local function runCombatLoop()
-    while autoCompleteActive do
+-- ==========================================
+-- BUCLE 1: MÓDULO DUNGEON (MATAR A TODOS)
+-- ==========================================
+local function runDungeonLoop()
+    while autoDungeonActive do
+        if not character or not character:FindFirstChild("HumanoidRootPart") then
+            character = localPlayer.Character
+            if character then humanoidRootPart = character:FindFirstChild("HumanoidRootPart") end
+        end
+
+        local enemies = getAllAliveEnemies()
+        
+        if #enemies > 0 then
+            for _, enemy in ipairs(enemies) do
+                if not autoDungeonActive then break end
+                
+                local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
+                local enemyHead = enemy:FindFirstChild("Head")
+                
+                if enemyHumanoid and enemyHumanoid.Health > 0 and enemyHead then
+                    local maxTime = 0.4    
+                    local elapsedTime = 0
+                    
+                    while elapsedTime < maxTime and enemyHumanoid.Health > 0 and autoDungeonActive do
+                        if humanoidRootPart and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
+                            -- Altura H=20 para total inmunidad a golpes
+                            humanoidRootPart.CFrame = enemyHead.CFrame * CFrame.new(0, 20, 0)
+                        end
+                        
+                        executeRealFastAttack(enemy, enemyHead)
+                        
+                        task.wait(0.01) 
+                        elapsedTime = elapsedTime + 0.01
+                    end
+                end
+            end
+        end
+        task.wait()
+    end
+end
+
+-- ==========================================
+-- BUCLE 2: MÓDULO RAIDS (AISLAMIENTO Y PROGRESO)
+-- ==========================================
+local function runRaidLoop()
+    while autoRaidActive do
         if not character or not character:FindFirstChild("HumanoidRootPart") then
             character = localPlayer.Character
             if character then humanoidRootPart = character:FindFirstChild("HumanoidRootPart") end
@@ -94,7 +158,7 @@ local function runCombatLoop()
         
         if #enemies > 0 then
             for _, enemy in ipairs(enemies) do
-                if not autoCompleteActive then break end
+                if not autoRaidActive then break end
                 
                 local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
                 local enemyHead = enemy:FindFirstChild("Head")
@@ -103,9 +167,9 @@ local function runCombatLoop()
                     local maxTime = 0.4    
                     local elapsedTime = 0
                     
-                    while elapsedTime < maxTime and enemyHumanoid.Health > 0 and autoCompleteActive do
+                    while elapsedTime < maxTime and enemyHumanoid.Health > 0 and autoRaidActive do
                         if humanoidRootPart and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-                            -- Altura de seguridad (20 unidades) para evitar hitboxes enemigos
+                            -- Altura de seguridad de 20 unidades
                             humanoidRootPart.CFrame = enemyHead.CFrame * CFrame.new(0, 20, 0)
                         end
                         
@@ -117,20 +181,19 @@ local function runCombatLoop()
                 end
             end
         else
-            -- Si no quedan enemigos en tu zona, verificar si el juego anunció el desbloqueo de la siguiente fase
+            -- Si limpiaste tu entorno, verificar alertas de progreso a nueva isla
             local playerGui = localPlayer:FindFirstChild("PlayerGui")
             local mainGui = playerGui and playerGui:FindFirstChild("Main")
-            local centerMsg = mainGui and mainGui:FindFirstChild("CenterMsg") -- Alerta nativa de Blox Fruits
+            local centerMsg = mainGui and mainGui:FindFirstChild("CenterMsg")
             
-            -- Detectar si aparece el texto de nueva isla o si la sala actual está vacía por completo
             if centerMsg and centerMsg.Visible and (string.find(string.lower(centerMsg.Text), "desbloque") or string.find(string.lower(centerMsg.Text), "island")) then
                 currentIslandNumber = currentIslandNumber + 1
                 local nextIslandPart = findNextRaidIsland(currentIslandNumber)
                 
                 if nextIslandPart and humanoidRootPart then
-                    task.wait(1.0) -- Pausa de estabilidad antes del viaje de fase
+                    task.wait(1.0)
                     humanoidRootPart.CFrame = nextIslandPart.CFrame * CFrame.new(0, 25, 0)
-                    task.wait(2.0) -- Espera de sincronización de mapa
+                    task.wait(2.0)
                 end
             end
         end
@@ -139,7 +202,7 @@ local function runCombatLoop()
 end
 
 -- ==========================================
--- CORRECCIÓN: AUTO V4 ENGINE VIA INVENTARIO ("DESPERTAR")
+-- AUTO V4 ARREGLADO (GLOBAL VIA INVENTARIO)
 -- ==========================================
 task.spawn(function()
     while task.wait(1.0) do
@@ -149,25 +212,22 @@ task.spawn(function()
             local mainGui = playerGui and playerGui:FindFirstChild("Main")
             local awakeningBar = mainGui and mainGui:FindFirstChild("Awakening")
             
-            -- Verificar si el medidor de furia de la interfaz está activo y visible al máximo
             if awakeningBar and awakeningBar.Visible and humanoid then
-                -- Buscar la herramienta Despertar en la mochila (Backpack) o en la mano
+                -- Buscar la herramienta "Despertar" en el inventario o equipada
                 local v4Tool = localPlayer.Backpack:FindFirstChild("Despertar") or character:FindFirstChild("Despertar")
                 
                 if v4Tool then
                     local currentWeapon = character:FindFirstChildOfClass("Tool")
                     
-                    -- Intercambio rápido seguro para activar la V4
                     humanoid:EquipTool(v4Tool)
                     task.wait(0.1)
                     v4Tool:Activate()
                     task.wait(0.2)
                     
-                    -- Regresar al arma de ataque original si existía una
                     if currentWeapon and currentWeapon.Name ~= "Despertar" then
                         humanoid:EquipTool(currentWeapon)
                     end
-                    task.wait(10) -- Evita loops de re-equipamiento continuo
+                    task.wait(10)
                 end
             end
         end
@@ -180,48 +240,68 @@ end)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Edsusito Dungeon",
-   LoadingTitle = "Cargando Sistema Anti-Desvío...",
+   Name = "Edsusito Dungeon & Raids",
+   LoadingTitle = "Iniciando Panel de Proyecto...",
    LoadingSubtitle = "by Edsu",
-   ConfigurationSaving = {
-      Enabled = false
-   },
-   Discord = {
-      Enabled = false
-   },
+   ConfigurationSaving = { Enabled = false },
+   Discord = { Enabled = false },
    KeySystem = false
 })
 
-local CombatTab = Window:CreateTab("Combate", 4483362458)
+-- PESTAÑA 1: DUNGEONS (El que ya teníamos)
+local DungeonTab = Window:CreateTab("Dungeon", 4483362458) -- Icono de espada
 
-CombatTab:CreateSection("Filtros de Raid Privada")
+DungeonTab:CreateSection("Modo Dungeon Clásico")
 
-CombatTab:CreateToggle({
-   Name = "Auto Completar (Aislar Mi Raid)",
+DungeonTab:CreateToggle({
+   Name = "Auto Completar Dungeon (Todos los NPCs)",
    CurrentValue = false,
-   Flag = "AutoCombatFlag",
+   Flag = "AutoDungeonFlag",
    Callback = function(Value)
-      autoCompleteActive = Value
+      autoDungeonActive = Value
       if Value then
-          -- Reiniciar al primer piso/isla al encenderlo
-          currentIslandNumber = 1 
-          task.spawn(runCombatLoop)
+          autoRaidActive = false -- Failsafe: Apaga el otro modo para evitar conflictos
+          task.spawn(runDungeonLoop)
       end
    end,
 })
 
-CombatTab:CreateToggle({
+-- PESTAÑA 2: RAIDS (El último con filtros anti-desvío e islas)
+local RaidTab = Window:CreateTab("Raids", 4483362458)
+
+RaidTab:CreateSection("Modo Raid Inteligente")
+
+RaidTab:CreateToggle({
+   Name = "Auto Completar Raid (Filtro Isla Privada)",
+   CurrentValue = false,
+   Flag = "AutoRaidFlag",
+   Callback = function(Value)
+      autoRaidActive = Value
+      if Value then
+          autoDungeonActive = false -- Failsafe: Apaga el otro modo para evitar conflictos
+          currentIslandNumber = 1   -- Reiniciar cuenta de islas
+          task.spawn(runRaidLoop)
+      end
+   end,
+})
+
+-- CONFIGURACIÓN GLOBAL (Aplica a ambos modos)
+local SettingsTab = Window:CreateTab("Configuración", 4483362458)
+
+SettingsTab:CreateSection("Poder Supremo")
+
+SettingsTab:CreateToggle({
    Name = "Auto Activar V4 (Inventario Despertar)",
    CurrentValue = false,
-   Flag = "AutoV4Flag",
+   Flag = "GlobalAutoV4Flag",
    Callback = function(Value)
       autoV4Active = Value
    end,
 })
 
 Rayfield:Notify({
-   Title = "Aislamiento Activo",
-   Content = "El filtro ignorará NPCs fuera de un radio de " .. tostring(maxRaidDistance) .. " studs.",
+   Title = "Estructura Cargada",
+   Content = "Módulos Dungeon y Raids separados exitosamente en Rayfield.",
    Duration = 5,
    Image = 4483362458,
 })
