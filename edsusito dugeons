@@ -1,51 +1,195 @@
--- ⚔️ Edsusito Fast Attack ⚔️
--- TP encima de cada NPC, golpear hasta matarlo, luego cambiar de objetivo
-
+local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
 
-local FastAttackEnabled = true -- Actívalo en true para pruebas
-local FAST_ATTACK_RANGE = 100
+local localPlayer = Players.LocalPlayer
+local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
--- Buscar NPCs vivos cercanos
-local function GetTargets()
-    local targets = {}
-    for _, npc in pairs(workspace:GetChildren()) do
-        local hum = npc:FindFirstChild("Humanoid")
-        local head = npc:FindFirstChild("Head")
-        if hum and head and hum.Health > 0 then
-            local dist = (head.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-            if dist <= FAST_ATTACK_RANGE then
-                table.insert(targets, {npc, head})
+-- [BLOX FRUITS REAL VARIABLES]
+local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
+local rigController = ReplicatedStorage:FindFirstChild("RigControllerEvent")
+
+local autoCompleteActive = false
+
+-- ==========================================
+-- CORE FUNCTIONS
+-- ==========================================
+
+-- Remote attack function using Blox Fruits event
+local function attackEnemy()
+    if rigController then
+        rigController:FireServer("weaponChange")
+    end
+    
+    -- Failsafe: Activate equipped tool (Combat/Sword/Fruit)
+    local tool = character:FindFirstChildOfClass("Tool")
+    if tool then
+        tool:Activate()
+    end
+end
+
+-- Scan the workspace folder for valid targets
+local function getAliveEnemiesList()
+    local enemyList = {}
+    
+    for _, object in ipairs(enemiesFolder:GetChildren()) do
+        if object:IsA("Model") and object ~= character then
+            local humanoid = object:FindFirstChildOfClass("Humanoid")
+            local head = object:FindFirstChild("Head")
+            
+            if humanoid and humanoid.Health > 0 and head then
+                table.insert(enemyList, object)
             end
         end
     end
-    return targets
+    return enemyList
 end
 
--- Atacar un NPC hasta que muera
-local function AttackNPC(npc, head)
-    while FastAttackEnabled and npc and head and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 do
-        -- TP encima del NPC
-        LocalPlayer.Character.HumanoidRootPart.CFrame = head.CFrame + Vector3.new(0,6,0)
-        -- Golpe
-        pcall(function()
-            ReplicatedStorage.RigControllerEvent:FireServer("attack", "m1")
-            ReplicatedStorage.RigControllerEvent:FireServer("hit", head)
-        end)
-        task.wait(0.3) -- velocidad de ataque
+-- Dynamic search for the dungeon exit gate
+local function findExitGate()
+    local targetNames = {"Exit", "Gate", "Portal", "Barrier"}
+    for _, object in ipairs(Workspace:GetDescendants()) do
+        if object:IsA("BasePart") then
+            for _, name in ipairs(targetNames) do
+                if object.Name == name then
+                    return object
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- ==========================================
+-- MAIN AUTOMATION LOOP
+-- ==========================================
+local function startAutoComplete()
+    autoCompleteActive = true
+    print("Auto Complete Sequence Started!")
+    
+    while autoCompleteActive do
+        local enemies = getAliveEnemiesList()
+        
+        if #enemies == 0 then
+            -- FAILSAFE: Wait 2.5 seconds to make sure the game loaded the new room's enemies
+            print("Room looks empty. Checking for spawn delay...")
+            task.wait(2.5) 
+            enemies = getAliveEnemiesList() -- Double check the enemy list
+            
+            -- If it's still empty, then the room is officially cleared. Find the gate!
+            if #enemies == 0 then
+                print("Room cleared! Searching for exit gate...")
+                local exitGate = findExitGate()
+                
+                if exitGate then
+                    if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
+                        -- Teleport slightly in front of the gate object
+                        humanoidRootPart.CFrame = exitGate.CFrame * CFrame.new(0, 0, -3)
+                    end
+                    task.wait(2) -- Wait time for the game to transition to the next room
+                else
+                    task.wait(1) 
+                end
+            end
+        else
+            -- 0.4 seconds target rotation loop (Strict requirements)
+            for _, enemy in ipairs(enemies) do
+                if not autoCompleteActive then break end
+                
+                local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
+                local enemyHead = enemy:FindFirstChild("Head")
+                
+                if enemyHumanoid and enemyHumanoid.Health > 0 and enemyHead then
+                    local maxTime = 0.4    
+                    local hitInterval = 0.01 
+                    local elapsedTime = 0
+                    
+                    while elapsedTime < maxTime and enemyHumanoid.Health > 0 and autoCompleteActive do
+                        if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
+                            -- Position player right above enemy head
+                            humanoidRootPart.CFrame = enemyHead.CFrame * CFrame.new(0, 4, 0)
+                        end
+                        
+                        attackEnemy()
+                        
+                        task.wait(hitInterval)
+                        elapsedTime = elapsedTime + hitInterval
+                    end
+                end
+            end
+        end
+        task.wait(0.1)
     end
 end
 
--- Bucle principal
-task.spawn(function()
-    while FastAttackEnabled do
-        local targets = GetTargets()
-        for _, target in pairs(targets) do
-            local npc, head = target[1], target[2]
-            AttackNPC(npc, head) -- lo mata antes de pasar al siguiente
-        end
-        task.wait(0.2)
+-- ==========================================
+-- GRAPHICAL USER INTERFACE (GUI)
+-- ==========================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "EdsusitoDungeonGui"
+screenGui.ResetOnSpawn = false
+
+local success, errorMsg = pcall(function() screenGui.Parent = CoreGui end)
+if not success then screenGui.Parent = localPlayer:WaitForChild("PlayerGui") end
+
+-- Main Window Frame
+local mainWindow = Instance.new("Frame")
+mainWindow.Name = "MainWindow"
+mainWindow.Size = UDim2.new(0, 250, 0, 150)
+mainWindow.Position = UDim2.new(0.5, -125, 0.4, -75)
+mainWindow.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+mainWindow.BorderSizePixel = 0
+mainWindow.Active = true
+mainWindow.Draggable = true
+mainWindow.Parent = screenGui
+
+local windowCorner = Instance.new("UICorner")
+windowCorner.CornerRadius = UDim.new(0, 8)
+windowCorner.Parent = mainWindow
+
+-- Title Label: Edsusito Dungeon
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Name = "TitleLabel"
+titleLabel.Size = UDim2.new(1, 0, 0, 35)
+titleLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+titleLabel.Text = "Edsusito Dungeon"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 16
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.BorderSizePixel = 0
+titleLabel.Parent = mainWindow
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 8)
+titleCorner.Parent = titleLabel
+
+-- Action Button: Auto Completar
+local actionButton = Instance.new("TextButton")
+actionButton.Name = "ActionButton"
+actionButton.Size = UDim2.new(0, 180, 0, 45)
+actionButton.Position = UDim2.new(0.5, -90, 0.6, -22)
+actionButton.BackgroundColor3 = Color3.fromRGB(0, 150, 90)
+actionButton.Text = "Auto Completar"
+actionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+actionButton.TextSize = 18
+actionButton.Font = Enum.Font.SourceSansBold
+actionButton.Parent = mainWindow
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 6)
+buttonCorner.Parent = actionButton
+
+-- Interaction Setup
+actionButton.MouseButton1Click:Connect(function()
+    if not autoCompleteActive then
+        actionButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+        actionButton.Text = "Stop"
+        task.spawn(startAutoComplete)
+    else
+        autoCompleteActive = false
+        actionButton.BackgroundColor3 = Color3.fromRGB(0, 150, 90)
+        actionButton.Text = "Auto Completar"
     end
 end)
