@@ -4,7 +4,7 @@
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Variables
 local AttackMode = "Sword"
@@ -12,7 +12,7 @@ local AutoDungeonEnabled = false
 local currentIndex = 1
 local FAST_ATTACK_RANGE = 80
 
--- Detectar arma equipada
+-- Función: verificar arma equipada
 local function HasWeaponEquipped()
     local char = LocalPlayer.Character
     if not char then return false end
@@ -25,7 +25,7 @@ local function HasWeaponEquipped()
     return false
 end
 
--- Obtener NPCs vivos cercanos
+-- Función: obtener NPCs vivos cercanos
 local function GetAllTargets()
     local targets = {}
     for _, npc in pairs(workspace:GetChildren()) do
@@ -41,7 +41,7 @@ local function GetAllTargets()
     return targets
 end
 
--- Ataque dinámico con rotación cada 0.4s
+-- Función: ataque dinámico con rotación cada 0.4s
 local function AutoTargetAttack()
     if not HasWeaponEquipped() then return end
     local targets = GetAllTargets()
@@ -52,8 +52,10 @@ local function AutoTargetAttack()
         local head = targets[1][2]
         if npc and head then
             LocalPlayer.Character.HumanoidRootPart.CFrame = npc.HumanoidRootPart.CFrame + Vector3.new(0,2,0)
-            game:GetService("ReplicatedStorage").RigControllerEvent:FireServer("attack", "m1")
-            game:GetService("ReplicatedStorage").RigControllerEvent:FireServer("hit", head)
+            pcall(function()
+                ReplicatedStorage.RigControllerEvent:FireServer("attack", "m1")
+                ReplicatedStorage.RigControllerEvent:FireServer("hit", head)
+            end)
         end
         return
     end
@@ -67,12 +69,14 @@ local function AutoTargetAttack()
     local head = targets[currentIndex][2]
     if npc and head then
         LocalPlayer.Character.HumanoidRootPart.CFrame = npc.HumanoidRootPart.CFrame + Vector3.new(0,2,0)
-        game:GetService("ReplicatedStorage").RigControllerEvent:FireServer("attack", "m1")
-        game:GetService("ReplicatedStorage").RigControllerEvent:FireServer("hit", head)
+        pcall(function()
+            ReplicatedStorage.RigControllerEvent:FireServer("attack", "m1")
+            ReplicatedStorage.RigControllerEvent:FireServer("hit", head)
+        end)
     end
 end
 
--- Buscar puerta/portal
+-- Función: buscar puerta/portal dinámicamente
 local function FindDoor()
     local doorNames = {"Exit","Gate","Portal","Barrier"}
     for _, name in pairs(doorNames) do
@@ -89,13 +93,18 @@ local function FindDoor()
     return nil
 end
 
--- Teletransportarse a la puerta
+-- Función: teletransportarse a la puerta con fallback
 local function GoToDoor()
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     local door = FindDoor()
-    if hrp and door then
-        hrp.CFrame = door.CFrame + Vector3.new(0,5,0)
+    if hrp then
+        if door then
+            hrp.CFrame = door.CFrame + Vector3.new(0,5,0)
+        else
+            hrp.CFrame = hrp.CFrame + Vector3.new(0,0,50)
+            warn("No se encontró puerta, usando fallback")
+        end
     end
 end
 
