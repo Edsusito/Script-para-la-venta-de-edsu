@@ -8,6 +8,7 @@ local localPlayer = Players.LocalPlayer
 local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
+-- Inmunidad al cambio de sala: Re-enganchar el cuerpo si el personaje parpadea o muere
 localPlayer.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
@@ -28,17 +29,15 @@ local statusLabel
 local function executeRealFastAttack(enemy, headObject)
     if not enemy or not headObject then return end
     
-    -- Failsafe: Activar herramienta local obligatoria
     local tool = character:FindFirstChildOfClass("Tool")
     if tool then
         tool:Activate()
     end
     
-    -- Invocación nativa al motor de daño de Blox Fruits extraída de tu script
     pcall(function()
         local targetsTable = {{enemy, headObject}}
         registerAttack:FireServer(0)
-        task.wait(0.01) -- Ajustado al Cooldown del problema
+        task.wait(0.01) 
         registerHit:FireServer(headObject, targetsTable)
     end)
 end
@@ -57,12 +56,19 @@ local function getAliveEnemiesList()
     return enemyList
 end
 
-local function findExitGate()
-    local targetNames = {"Exit", "Gate", "Portal", "Barrier"}
+-- ==========================================
+-- DYNAMIC FLOOR TRACKER (Solución Examen)
+-- ==========================================
+local function findCurrentFloor()
+    -- Escanea todo el Workspace buscando objetos que contengan la palabra "Floor" o "floor"
     for _, object in ipairs(Workspace:GetDescendants()) do
-        if object:IsA("BasePart") then
-            for _, name in ipairs(targetNames) do
-                if object.Name == name then
+        if object:IsA("BasePart") or object:IsA("Model") then
+            -- Convertimos a minúsculas para evitar errores si se llama Floor o floor
+            if string.find(string.lower(object.Name), "floor") then
+                -- Si es un modelo, devolvemos su parte principal o su centro primario
+                if object:IsA("Model") then
+                    return object.PrimaryPart or object:FindFirstChildOfClass("BasePart")
+                else
                     return object
                 end
             end
@@ -78,25 +84,32 @@ local function startAutoComplete()
     autoCompleteActive = true
     
     while autoCompleteActive do
+        -- Mantener la referencia del cuerpo actualizada en vivo
+        if not character or not character:FindFirstChild("HumanoidRootPart") then
+            character = localPlayer.Character
+            if character then humanoidRootPart = character:FindFirstChild("HumanoidRootPart") end
+        end
+
         local enemies = getAliveEnemiesList()
         
         if #enemies == 0 then
-            if statusLabel then statusLabel.Text = "SYSTEM // CHECKING SPAWN..." end
-            task.wait(1.5) 
+            if statusLabel then statusLabel.Text = "SYSTEM // WAVE CLEARED!" end
+            task.wait(1.0) 
+            
             enemies = getAliveEnemiesList()
             
             if #enemies == 0 then
-                if statusLabel then statusLabel.Text = "SYSTEM // SEARCHING GATE..." end
-                local exitGate = findExitGate()
+                if statusLabel then statusLabel.Text = "SYSTEM // SCANNING NEXT FLOOR..." end
                 
-                if exitGate then
-                    if statusLabel then statusLabel.Text = "SYSTEM // TELEPORTING TO GATE!" end
-                    if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-                        humanoidRootPart.CFrame = exitGate.CFrame * CFrame.new(0, 0, -3)
-                    end
-                    task.wait(1.5) 
+                local currentFloorPart = findCurrentFloor()
+                if currentFloorPart and humanoidRootPart then
+                    if statusLabel then statusLabel.Text = "SYSTEM // TELEPORTING TO " .. string.upper(currentFloorPart.Name) end
+                    
+                    -- Te mueve al centro exacto del Floor actual para forzar el avance de sala
+                    humanoidRootPart.CFrame = currentFloorPart.CFrame * CFrame.new(0, 3, 0)
+                    task.wait(2.0) -- Tiempo prudente para que carguen los nuevos enemigos
                 else
-                    task.wait(0.5) 
+                    task.wait(0.5)
                 end
             end
         else
@@ -106,7 +119,7 @@ local function startAutoComplete()
                 local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
                 local enemyHead = enemy:FindFirstChild("Head")
                 
-                if enemyHumanoid and enemyHumanoid.Health > 0 and enemyHead then
+                if enemyHumanoid and enemyHumanoid.Health > 0 and head then
                     local maxTime = 0.4    
                     local elapsedTime = 0
                     
@@ -116,15 +129,14 @@ local function startAutoComplete()
                     end
                     
                     while elapsedTime < maxTime and enemyHumanoid.Health > 0 and autoCompleteActive do
-                        if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-                            -- DISTANCIA SOLICITADA: 10 unidades exactas sobre su cabeza
+                        if humanoidRootPart and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
+                            -- Inmunidad de altura: 10 unidades sobre la cabeza del NPC
                             humanoidRootPart.CFrame = enemyHead.CFrame * CFrame.new(0, 10, 0)
                         end
                         
-                        -- Ejecutar el Fast Attack integrado con Remotos reales
                         executeRealFastAttack(enemy, enemyHead)
                         
-                        task.wait(0.01) -- Frecuencia estricta de golpes de la rúbrica
+                        task.wait(0.01) 
                         elapsedTime = elapsedTime + 0.01
                     end
                 end
@@ -135,7 +147,7 @@ local function startAutoComplete()
 end
 
 -- ==========================================
--- COLD ELECTRIC GUI DESIGN (Problema 9)
+-- COLD ELECTRIC GUI DESIGN
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "EdsusitoDungeonGui"
