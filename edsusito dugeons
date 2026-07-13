@@ -1,7 +1,6 @@
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local localPlayer = Players.LocalPlayer
 local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
@@ -21,12 +20,49 @@ local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
 -- Variables de Estado
 local autoCompleteActive = false
 local autoV4Active = false
+local selectedWeaponType = "Estilo de Combate" -- Valor por defecto
 
 -- ==========================================
--- COMPATIBLE FAST ATTACK ENGINE (H = 20)
+-- MOTOR DE CONTROL DE ARMAS (EQUIP AUTO)
+-- ==========================================
+local function equipSelectedWeapon()
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    -- Verificar si ya tenemos el arma correcta equipada
+    local currentTool = character:FindFirstChildOfClass("Tool")
+    if currentTool and currentTool.Name ~= "Despertar" then
+        -- Si ya hay algo equipado y coincide con el tipo, no hacemos nada
+        if selectedWeaponType == "Espada" and currentTool:FindFirstChild("Sword") then
+            return
+        elseif selectedWeaponType == "Estilo de Combate" and (currentTool:FindFirstChild("Combat") or currentTool.Name == "Combat" or currentTool.Name == "Dark Step" or currentTool.Name == "Electric" or currentTool.Name == "Water Kung Fu" or currentTool.Name == "Dragon Breath") then
+            return
+        end
+    end
+
+    -- Buscar en el inventario (Backpack) para equipar
+    for _, tool in ipairs(localPlayer.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            if selectedWeaponType == "Espada" and tool:FindFirstChild("Sword") then
+                humanoid:EquipTool(tool)
+                break
+            elseif selectedWeaponType == "Estilo de Combate" and (tool:FindFirstChild("Combat") or tool.Name == "Combat" or tool.Name == "Dark Step" or tool.Name == "Electric" or tool.Name == "Water Kung Fu" or tool.Name == "Dragon Breath") then
+                humanoid:EquipTool(tool)
+                break
+            end
+        end
+    end
+end
+
+-- ==========================================
+-- INTEGRATED FAST ATTACK ENGINE (H = 20)
 -- ==========================================
 local function executeRealFastAttack(enemy, headObject)
     if not enemy or not headObject then return end
+    
+    -- Forzar que el arma elegida esté en la mano antes de golpear
+    equipSelectedWeapon()
     
     local tool = character:FindFirstChildOfClass("Tool")
     if tool then
@@ -80,7 +116,7 @@ local function runCombatLoop()
                     
                     while elapsedTime < maxTime and enemyHumanoid.Health > 0 and autoCompleteActive do
                         if humanoidRootPart and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-                            -- AJUSTE: 20 unidades de altura para total inmunidad a golpes
+                            -- Altura de seguridad de 20 unidades solicitada
                             humanoidRootPart.CFrame = enemyHead.CFrame * CFrame.new(0, 20, 0)
                         end
                         
@@ -91,54 +127,88 @@ local function runCombatLoop()
                     end
                 end
             end
+        else
+            -- Si no hay enemigos, mantenemos el arma equipada por estabilidad
+            equipSelectedWeapon()
         end
         task.wait()
     end
 end
 
 -- ==========================================
--- AUTO V4 ENGINE
+-- DETECTOR Y ACTIVADOR DE V4 ("DESPERTAR")
 -- ==========================================
 task.spawn(function()
-    while task.wait(0.5) do
-        if autoV4Active then
-            pcall(function()
-                -- Verificar la existencia de la barra de despertar en la interfaz real de Blox Fruits
-                local playerGui = localPlayer:FindFirstChild("PlayerGui")
-                local mainGui = playerGui and playerGui:FindFirstChild("Main")
-                local awakeningBar = mainGui and mainGui:FindFirstChild("Awakening")
+    while task.wait(1.0) do
+        if autoV4Active and character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            local playerGui = localPlayer:FindFirstChild("PlayerGui")
+            
+            -- Verificar si la furia (Awakening) está al máximo en la UI real
+            local mainGui = playerGui and playerGui:FindFirstChild("Main")
+            local awakeningFrame = mainGui and mainGui:FindFirstChild("Awakening")
+            
+            -- Si el juego indica que se puede usar la V4
+            if awakeningFrame and awakeningFrame.Visible and humanoid then
+                -- 1. Buscar la herramienta "Despertar" en el inventario o cuerpo
+                local v4Tool = localPlayer.Backpack:FindFirstChild("Despertar") or character:FindFirstChild("Despertar")
                 
-                -- Si está llena o el botón es visible, forzar la activación por hardware virtual
-                if awakeningBar and awakeningBar.Visible then
-                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Y, false, game)
+                if v4Tool then
+                    -- Guardar el arma que tenías puesta para no perder el hilo del ataque
+                    local previousTool = character:FindFirstChildOfClass("Tool")
+                    
+                    -- Equipar "Despertar" y activarla
+                    humanoid:EquipTool(v4Tool)
                     task.wait(0.1)
-                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Y, false, game)
-                    task.wait(5) -- Cooldown para evitar spam de inputs
+                    v4Tool:Activate()
+                    task.wait(0.2)
+                    
+                    -- Volver a equipar tu arma de combate principal
+                    if previousTool then
+                        humanoid:EquipTool(previousTool)
+                    else
+                        equipSelectedWeapon()
+                    end
+                    
+                    task.wait(10) -- Cooldown largo de seguridad
                 end
-            end)
+            end
         end
     end
 end)
 
 -- ==========================================
--- CARGA DE LIBRERÍA RAYFIELD UI
+-- LIBRERÍA RAYFIELD UI
 -- ==========================================
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
    Name = "Edsusito Dungeon",
-   LoadingTitle = "Cargando Sistema...",
+   LoadingTitle = "Iniciando Defensa de Proyecto...",
    LoadingSubtitle = "by Edsu",
-   ConfigurationSaving = {
-      Enabled = false
-   },
-   Discord = {
-      Enabled = false
-   },
+   ConfigurationSaving = { Enabled = false },
+   Discord = { Enabled = false },
    KeySystem = false
 })
 
-local CombatTab = Window:CreateTab("Combate", 4483362458) -- Icono de espada
+local CombatTab = Window:CreateTab("Combate", 4483362458)
+
+CombatTab:CreateSection("Configuración de Armas")
+
+-- Selector dinámico exigido por el profesor
+CombatTab:CreateDropdown({
+   Name = "Seleccionar Arma de Combate",
+   Options = {"Estilo de Combate", "Espada"},
+   CurrentOption = "Estilo de Combate",
+   MultipleOptions = false,
+   Flag = "WeaponSelectFlag",
+   Callback = function(Option)
+      selectedWeaponType = Option[1] or Option
+      if autoCompleteActive then
+          equipSelectedWeapon()
+      end
+   end,
+})
 
 CombatTab:CreateSection("Automatización")
 
@@ -155,17 +225,17 @@ CombatTab:CreateToggle({
 })
 
 CombatTab:CreateToggle({
-   Name = "Auto Activar V4",
+   Name = "Auto Activar V4 (Despertar)",
    CurrentValue = false,
-   Flag = "AutoV4Flag",
+   Flag = "AutoV4RealFlag",
    Callback = function(Value)
       autoV4Active = Value
    end,
 })
 
 Rayfield:Notify({
-   Title = "Sistema Listo",
-   Content = "Edsusito Dungeon cargado con éxito en Rayfield.",
+   Title = "Módulo Listo",
+   Content = "Failsafe de altura h=20 e inventario sincronizados correctamente.",
    Duration = 5,
    Image = 4483362458,
 })
