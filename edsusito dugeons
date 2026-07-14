@@ -1,22 +1,19 @@
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local localPlayer = Players.LocalPlayer
 local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
-local spawnPosition = nil -- Guarda el punto de aparición en la sala actual
+local hakiYaActivado = false
 
 -- Evento para cuando el personaje muere y revive
 localPlayer.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
-    -- Al revivir, registramos inmediatamente la nueva posición de spawn para no perder el hilo
-    task.wait(0.5)
-    if humanoidRootPart then
-        spawnPosition = humanoidRootPart.Position
-    end
+    hakiYaActivado = false 
 end)
 
 local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
@@ -26,11 +23,43 @@ local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
 
 local autoDungeonActive = false
 local currentTarget = nil
-local lastTarget = nil -- Guarda el último objetivo para forzar la rotación
+local lastTarget = nil 
 
--- Función para equipar automáticamente la espada (Sword)
-local function EquipSword()
-    if not character then return end
+-- Detección de Haki
+local function IsHakiActive()
+    if not character then return false end
+    if character:GetAttribute("Haki") == true or character:GetAttribute("Buso") == true or character:GetAttribute("HasBuso") == true then
+        return true
+    end
+    for _, child in ipairs(character:GetDescendants()) do
+        if child:IsA("BasePart") then
+            if child:FindFirstChild("HasBuso") or child:FindFirstChild("BusoShading") or child.Name == "Buso" then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function ForceActivateHaki()
+    if not character or not autoDungeonActive then return end
+    if IsHakiActive() or hakiYaActivado then
+        hakiYaActivado = true 
+        return 
+    end
+    
+    hakiYaActivado = true 
+    task.spawn(function()
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.J, false, game)
+        task.wait(0.1)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.J, false, game)
+    end)
+end
+
+-- Equipar Espada
+local function ForceEquipSword()
+    if not character or not autoDungeonActive then return end
+    
     local currentTool = character:FindFirstChildOfClass("Tool")
     if currentTool and (currentTool.ToolTip == "Sword" or string.find(string.lower(currentTool.Name), "sword") or string.find(string.lower(currentTool.Name), "katana")) then
         return
@@ -50,6 +79,18 @@ local function EquipSword()
     end
 end
 
+-- Hilo de espada y haki
+local function StartAutoBuffs()
+    task.spawn(function()
+        while autoDungeonActive do
+            ForceEquipSword()
+            ForceActivateHaki()
+            task.wait(0.3)
+        end
+    end)
+end
+
+-- Obtener enemigo más cercano
 local function GetClosestEnemy()
     local closestEnemy = nil
     local shortestDistance = math.huge
@@ -128,7 +169,6 @@ local function AttackEnemy(enemy)
     local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
     if not enemyHead or not enemyHumanoid then return end
     
-    EquipSword() -- Forzamos el uso de la espada antes de atacar
     local tool = character:FindFirstChildOfClass("Tool")
     if tool then tool:Activate() end
     
@@ -139,7 +179,28 @@ local function AttackEnemy(enemy)
     end)
 end
 
--- Función para buscar el portal de SALIDA real y avanzar de sala automáticamente
+-- NUEVA FUNCIÓN: Identifica en qué sala física se encuentra parado el jugador actualmente
+local function GetCurrentRoomIndex(rooms)
+    if not humanoidRootPart then return 1 end
+    local myPos = humanoidRootPart.Position
+    local currentRoomIdx = 1
+    local minDistanceToRoomCenter = math.huge
+    
+    for i, room in ipairs(rooms) do
+        -- Estimamos el centro de la sala usando cualquier parte del mapa que tenga dentro
+        local roomPart = room:FindFirstChildOfClass("Part") or room:FindFirstChildOfClass("MeshPart") or room:FindFirstChild("Floor")
+        if roomPart then
+            local dist = (roomPart.Position - myPos).Magnitude
+            if dist < minDistanceToRoomCenter then
+                minDistanceToRoomCenter = dist
+                currentRoomIdx = i
+            end
+        end
+    end
+    return currentRoomIdx
+end
+
+-- LÓGICA DE PROGRESIÓN MEJORADA
 local function AutoPassRoom()
     local mapFolder = Workspace:FindFirstChild("Map")
     if not mapFolder then return end
@@ -147,56 +208,39 @@ local function AutoPassRoom()
     if not dungeonFolder then return end
     
     local rooms = dungeonFolder:GetChildren()
-    local availablePortals = {}
+    if #rooms == 0 then return end
     
-    -- Recolectamos todos los portales activos en el mapa
-    for i = 1, #rooms do
-        local room = rooms[i]
-        local teleporter = room:FindFirstChild("ExitTeleporter")
+    -- Ordenamos las salas por nombre (ej. Room1, Room2...) para saber el orden real de progresión
+    table.sort(rooms, function(a, b)
+        local numA = tonumber(string.match(a.Name, "%d+")) or 0
+        local numB = tonumber(string.match(b.Name, "%d+")) or 0
+        return numA < numB
+    end)
+    
+    -- Detectamos en qué número de sala estamos parados actualmente
+    local currentRoomIdx = GetCurrentRoomIndex(rooms)
+    local activeRoom = rooms[currentRoomIdx]
+    
+    if activeRoom then
+        -- Buscamos el ExitTeleporter de la sala en la que estamos parados.
+        -- Esto garantiza que siempre iremos al portal de SALIDA de nuestra sala actual, 
+        -- y nunca al de una sala pasada ni a la entrada.
+        local teleporter = activeRoom:FindFirstChild("ExitTeleporter")
         if teleporter then
             local rootPart = teleporter:FindFirstChild("Root")
-            if rootPart and rootPart:IsA("BasePart") then
+            if rootPart and rootPart:IsA("BasePart") and humanoidRootPart then
                 local touchTransmitter = rootPart:FindFirstChildOfClass("TouchTransmitter")
                 if touchTransmitter then
-                    table.insert(availablePortals, rootPart)
-                end
-            end
-        end
-    end
-    
-    -- Si solo hay un portal en el mapa, lo tomamos directo (sin importar distancia)
-    if #availablePortals == 1 and humanoidRootPart then
-        local targetPortal = availablePortals[1]
-        humanoidRootPart.CFrame = targetPortal.CFrame
-        task.wait(0.1)
-        if firetouchinterest then
-            firetouchinterest(humanoidRootPart, targetPortal, 0)
-            task.wait(0.1)
-            firetouchinterest(humanoidRootPart, targetPortal, 1)
-        end
-        spawnPosition = nil
-        return true
-    elseif #availablePortals > 1 and humanoidRootPart then
-        -- Si hay más de uno, filtramos para ignorar el que esté cerca de nuestro spawn
-        for _, rootPart in ipairs(availablePortals) do
-            local isExitPortal = true
-            if spawnPosition then
-                local distanceToSpawn = (rootPart.Position - spawnPosition).Magnitude
-                if distanceToSpawn < 50 then -- Entrada
-                    isExitPortal = false
-                end
-            end
-            
-            if isExitPortal then
-                humanoidRootPart.CFrame = rootPart.CFrame
-                task.wait(0.1)
-                if firetouchinterest then
-                    firetouchinterest(humanoidRootPart, rootPart, 0)
+                    -- Teletransportación directa y activación física del portal correcto
+                    humanoidRootPart.CFrame = rootPart.CFrame
                     task.wait(0.1)
-                    firetouchinterest(humanoidRootPart, rootPart, 1)
+                    if firetouchinterest then
+                        firetouchinterest(humanoidRootPart, rootPart, 0)
+                        task.wait(0.1)
+                        firetouchinterest(humanoidRootPart, rootPart, 1)
+                    end
+                    return true
                 end
-                spawnPosition = nil
-                return true
             end
         end
     end
@@ -204,20 +248,10 @@ local function AutoPassRoom()
 end
 
 local function RotateTargets()
-    -- Guardamos la posición inicial al activar el script
-    if humanoidRootPart then
-        spawnPosition = humanoidRootPart.Position
-    end
-
     while autoDungeonActive do
         currentTarget = GetClosestEnemy()
         
         if currentTarget then
-            -- Si empezamos a pelear, nos aseguramos de registrar nuestro spawn si no se había guardado
-            if not spawnPosition and humanoidRootPart then
-                spawnPosition = humanoidRootPart.Position
-            end
-            
             lastTarget = currentTarget
             local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
             local timer = 0
@@ -230,11 +264,11 @@ local function RotateTargets()
                 timer = timer + 0.01
             end
         else
-            -- Si no hay enemigos, esperamos 1 segundo y buscamos el portal de salida
+            -- Si no hay enemigos, esperamos un momento para buscar el portal de la sala actual
             task.wait(1.0)
             local passed = AutoPassRoom()
             if not passed then
-                task.wait(0.2) -- Pausa corta para reevaluar si aún no aparece el portal de salida real
+                task.wait(0.5) -- Pausa antes de reintentar si no se ha generado el portal
             end
         end
     end
@@ -261,11 +295,13 @@ DungeonTab:CreateToggle({
     Callback = function(Value)
         autoDungeonActive = Value
         if Value then
+            hakiYaActivado = false 
+            StartAutoBuffs() 
             coroutine.wrap(RotateTargets)()
         else
             currentTarget = nil
             lastTarget = nil
-            spawnPosition = nil
+            hakiYaActivado = false
             Rayfield:Notify({
                 Title = "⚔️ Edsusito Dungeon ⚔️",
                 Content = "Ciclo de rotación pausado con éxito.",
