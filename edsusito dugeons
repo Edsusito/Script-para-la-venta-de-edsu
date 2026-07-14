@@ -8,12 +8,15 @@ local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
 local hakiYaActivado = false
+local justDied = false 
+local attackHeight = 20 -- Altura inicial por defecto (comienza en 20, pero ahora puedes subirlo hasta 100)
 
 -- Evento para cuando el personaje muere y revive
 localPlayer.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
     hakiYaActivado = false 
+    justDied = true 
 end)
 
 local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
@@ -92,6 +95,8 @@ end
 
 -- Obtener enemigo más cercano
 local function GetClosestEnemy()
+    if justDied then return nil end
+
     local closestEnemy = nil
     local shortestDistance = math.huge
     local currentCharacter = localPlayer.Character
@@ -145,7 +150,8 @@ local function TeleportToEnemy(enemy)
     if not enemyRoot then return false end
     
     local success, err = pcall(function()
-        humanoidRootPart.CFrame = enemyRoot.CFrame * CFrame.new(0, 20, 0)
+        -- Usamos la variable attackHeight configurada por el slider
+        humanoidRootPart.CFrame = enemyRoot.CFrame * CFrame.new(0, attackHeight, 0)
     end)
     
     if not success then
@@ -179,7 +185,7 @@ local function AttackEnemy(enemy)
     end)
 end
 
--- NUEVA FUNCIÓN: Identifica en qué sala física se encuentra parado el jugador actualmente
+-- Identifica en qué sala física se encuentra parado el jugador actualmente
 local function GetCurrentRoomIndex(rooms)
     if not humanoidRootPart then return 1 end
     local myPos = humanoidRootPart.Position
@@ -187,7 +193,6 @@ local function GetCurrentRoomIndex(rooms)
     local minDistanceToRoomCenter = math.huge
     
     for i, room in ipairs(rooms) do
-        -- Estimamos el centro de la sala usando cualquier parte del mapa que tenga dentro
         local roomPart = room:FindFirstChildOfClass("Part") or room:FindFirstChildOfClass("MeshPart") or room:FindFirstChild("Floor")
         if roomPart then
             local dist = (roomPart.Position - myPos).Magnitude
@@ -200,44 +205,41 @@ local function GetCurrentRoomIndex(rooms)
     return currentRoomIdx
 end
 
--- LÓGICA DE PROGRESIÓN MEJORADA
+-- Lógica de progresión
 local function AutoPassRoom()
     local mapFolder = Workspace:FindFirstChild("Map")
-    if not mapFolder then return end
+    if not mapFolder then return false end
     local dungeonFolder = mapFolder:FindFirstChild("Dungeon")
-    if not dungeonFolder then return end
+    if not dungeonFolder then return false end
     
     local rooms = dungeonFolder:GetChildren()
-    if #rooms == 0 then return end
+    if #rooms == 0 then return false end
     
-    -- Ordenamos las salas por nombre (ej. Room1, Room2...) para saber el orden real de progresión
     table.sort(rooms, function(a, b)
         local numA = tonumber(string.match(a.Name, "%d+")) or 0
         local numB = tonumber(string.match(b.Name, "%d+")) or 0
         return numA < numB
     end)
     
-    -- Detectamos en qué número de sala estamos parados actualmente
     local currentRoomIdx = GetCurrentRoomIndex(rooms)
     local activeRoom = rooms[currentRoomIdx]
     
     if activeRoom then
-        -- Buscamos el ExitTeleporter de la sala en la que estamos parados.
-        -- Esto garantiza que siempre iremos al portal de SALIDA de nuestra sala actual, 
-        -- y nunca al de una sala pasada ni a la entrada.
         local teleporter = activeRoom:FindFirstChild("ExitTeleporter")
         if teleporter then
             local rootPart = teleporter:FindFirstChild("Root")
             if rootPart and rootPart:IsA("BasePart") and humanoidRootPart then
                 local touchTransmitter = rootPart:FindFirstChildOfClass("TouchTransmitter")
                 if touchTransmitter then
-                    -- Teletransportación directa y activación física del portal correcto
                     humanoidRootPart.CFrame = rootPart.CFrame
-                    task.wait(0.1)
+                    task.wait(0.12)
                     if firetouchinterest then
                         firetouchinterest(humanoidRootPart, rootPart, 0)
                         task.wait(0.1)
                         firetouchinterest(humanoidRootPart, rootPart, 1)
+                    end
+                    if justDied then
+                        justDied = false
                     end
                     return true
                 end
@@ -251,12 +253,12 @@ local function RotateTargets()
     while autoDungeonActive do
         currentTarget = GetClosestEnemy()
         
-        if currentTarget then
+        if currentTarget and not justDied then
             lastTarget = currentTarget
             local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
             local timer = 0
             
-            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.5 do
+            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.5 and not justDied do
                 TeleportToEnemy(currentTarget)
                 AttackEnemy(currentTarget)
                 
@@ -264,11 +266,27 @@ local function RotateTargets()
                 timer = timer + 0.01
             end
         else
-            -- Si no hay enemigos, esperamos un momento para buscar el portal de la sala actual
-            task.wait(1.0)
-            local passed = AutoPassRoom()
-            if not passed then
-                task.wait(0.5) -- Pausa antes de reintentar si no se ha generado el portal
+            if justDied then
+                local passed = false
+                local attempts = 0
+                while autoDungeonActive and justDied and attempts < 10 do
+                    passed = AutoPassRoom()
+                    if passed then
+                        justDied = false 
+                        break
+                    end
+                    attempts = attempts + 1
+                    task.wait(0.5)
+                end
+                if attempts >= 10 then
+                    justDied = false
+                end
+            else
+                task.wait(1.0)
+                local passed = AutoPassRoom()
+                if not passed then
+                    task.wait(0.5)
+                end
             end
         end
     end
@@ -288,6 +306,7 @@ local Window = Rayfield:CreateWindow({
 local DungeonTab = Window:CreateTab("Dungeon", 4483362458)
 DungeonTab:CreateSection("Control Principal")
 
+-- BOTÓN TOGGLE PRINCIPAL
 DungeonTab:CreateToggle({
     Name = "Auto Completar",
     CurrentValue = false,
@@ -296,12 +315,14 @@ DungeonTab:CreateToggle({
         autoDungeonActive = Value
         if Value then
             hakiYaActivado = false 
+            justDied = false
             StartAutoBuffs() 
             coroutine.wrap(RotateTargets)()
         else
             currentTarget = nil
             lastTarget = nil
             hakiYaActivado = false
+            justDied = false
             Rayfield:Notify({
                 Title = "⚔️ Edsusito Dungeon ⚔️",
                 Content = "Ciclo de rotación pausado con éxito.",
@@ -309,5 +330,20 @@ DungeonTab:CreateToggle({
                 Image = 4483362458,
             })
         end
+    end,
+})
+
+DungeonTab:CreateSection("Ajustes de Combate")
+
+-- SLIDER DE ALTURA MODIFICADO DE 10 A 100
+DungeonTab:CreateSlider({
+    Name = "Altura de Ataque",
+    Range = {10, 100}, -- Modificado: Ahora el mínimo es 10 y el máximo es 100
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = 20, -- Sigue iniciando en una altura segura de 20 por defecto
+    Flag = "AttackHeightFlag",
+    Callback = function(Value)
+        attackHeight = Value
     end,
 })
