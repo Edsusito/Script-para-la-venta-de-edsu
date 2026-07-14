@@ -1,8 +1,3 @@
--- =============================================================================
---               ⚔️ EDSUSITO DUNGEON ⚔️ - HIGH PERFORMANCE ENGINE
--- =============================================================================
-
--- Servicios Principales de Roblox
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,25 +6,50 @@ local localPlayer = Players.LocalPlayer
 local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
--- Actualización dinámica del Personaje
+local spawnPosition = nil -- Guarda el punto de aparición en la sala actual
+
+-- Evento para cuando el personaje muere y revive
 localPlayer.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
+    -- Al revivir, registramos inmediatamente la nueva posición de spawn para no perder el hilo
+    task.wait(0.5)
+    if humanoidRootPart then
+        spawnPosition = humanoidRootPart.Position
+    end
 end)
 
--- Variables de Red y Entorno (Blox Fruits Nativo)
 local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
 local registerAttack = netFolder:WaitForChild("RE/RegisterAttack")
 local registerHit = netFolder:WaitForChild("RE/RegisterHit")
 local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
 
--- Variables de Control de Estado
 local autoDungeonActive = false
 local currentTarget = nil
+local lastTarget = nil -- Guarda el último objetivo para forzar la rotación
 
--- =============================================================================
--- [FUNCIÓN 1]: FILTRADO Y PRIORIZACIÓN (NPC MÁS CERCANO VIVO)
--- =============================================================================
+-- Función para equipar automáticamente la espada (Sword)
+local function EquipSword()
+    if not character then return end
+    local currentTool = character:FindFirstChildOfClass("Tool")
+    if currentTool and (currentTool.ToolTip == "Sword" or string.find(string.lower(currentTool.Name), "sword") or string.find(string.lower(currentTool.Name), "katana")) then
+        return
+    end
+    
+    local backpack = localPlayer:FindFirstChildOfClass("Backpack")
+    if backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") and (tool.ToolTip == "Sword" or string.find(string.lower(tool.Name), "sword") or string.find(string.lower(tool.Name), "katana")) then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid:EquipTool(tool)
+                    break
+                end
+            end
+        end
+    end
+end
+
 local function GetClosestEnemy()
     local closestEnemy = nil
     local shortestDistance = math.huge
@@ -44,6 +64,9 @@ local function GetClosestEnemy()
     
     if sourceFolder then
         local children = sourceFolder:GetChildren()
+        local primaryCandidates = {}
+        local backupCandidates = {}
+        
         for i = 1, #children do
             local object = children[i]
             if object:IsA("Model") and object ~= currentCharacter then
@@ -52,20 +75,28 @@ local function GetClosestEnemy()
                 
                 if humanoid and humanoid.Health > 0 and root and object.Parent then
                     local distance = (root.Position - myPos).Magnitude
-                    if distance < shortestDistance then
-                        shortestDistance = distance
-                        closestEnemy = object
+                    if object ~= lastTarget then
+                        table.insert(primaryCandidates, {model = object, dist = distance})
+                    else
+                        table.insert(backupCandidates, {model = object, dist = distance})
                     end
                 end
+            end
+        end
+        
+        local targetList = #primaryCandidates > 0 and primaryCandidates or backupCandidates
+        
+        for i = 1, #targetList do
+            local candidate = targetList[i]
+            if candidate.dist < shortestDistance then
+                shortestDistance = candidate.dist
+                closestEnemy = candidate.model
             end
         end
     end
     return closestEnemy
 end
 
--- =============================================================================
--- [FUNCIÓN 2]: TELEPORTE SEGURO CON FALLBACK ANTIBUGS
--- =============================================================================
 local function TeleportToEnemy(enemy)
     if not enemy or not enemy.Parent or not humanoidRootPart then return false end
     
@@ -73,11 +104,9 @@ local function TeleportToEnemy(enemy)
     if not enemyRoot then return false end
     
     local success, err = pcall(function()
-        -- Posición ideal: 20 bloques exactamente arriba del objetivo
         humanoidRootPart.CFrame = enemyRoot.CFrame * CFrame.new(0, 20, 0)
     end)
     
-    -- FALLBACK: Si falla el teleporte o la instancia es inestable, se asegura en el suelo
     if not success then
         local raycastParams = RaycastParams.new()
         raycastParams.FilterDescendantsInstances = {character, enemy}
@@ -92,9 +121,6 @@ local function TeleportToEnemy(enemy)
     return true
 end
 
--- =============================================================================
--- [FUNCIÓN 3]: FAST ATTACK MOTOR (0.01s - GOLPES ILIMITADOS)
--- =============================================================================
 local function AttackEnemy(enemy)
     if not enemy or not enemy.Parent then return end
     
@@ -102,11 +128,10 @@ local function AttackEnemy(enemy)
     local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
     if not enemyHead or not enemyHumanoid then return end
     
-    -- Activación de Tool (Espada/Melee/Fruta equipado)
+    EquipSword() -- Forzamos el uso de la espada antes de atacar
     local tool = character:FindFirstChildOfClass("Tool")
     if tool then tool:Activate() end
     
-    -- Ejecución vía remotos nativos
     pcall(function()
         local targetsTable = {{enemy, enemyHead}}
         registerAttack:FireServer(0)
@@ -114,36 +139,107 @@ local function AttackEnemy(enemy)
     end)
 end
 
--- =============================================================================
--- [FUNCIÓN 4]: ROTACIÓN DINÁMICA DE OBJETIVOS (1 SEGUNDO MAX)
--- =============================================================================
+-- Función para buscar el portal de SALIDA real y avanzar de sala automáticamente
+local function AutoPassRoom()
+    local mapFolder = Workspace:FindFirstChild("Map")
+    if not mapFolder then return end
+    local dungeonFolder = mapFolder:FindFirstChild("Dungeon")
+    if not dungeonFolder then return end
+    
+    local rooms = dungeonFolder:GetChildren()
+    local availablePortals = {}
+    
+    -- Recolectamos todos los portales activos en el mapa
+    for i = 1, #rooms do
+        local room = rooms[i]
+        local teleporter = room:FindFirstChild("ExitTeleporter")
+        if teleporter then
+            local rootPart = teleporter:FindFirstChild("Root")
+            if rootPart and rootPart:IsA("BasePart") then
+                local touchTransmitter = rootPart:FindFirstChildOfClass("TouchTransmitter")
+                if touchTransmitter then
+                    table.insert(availablePortals, rootPart)
+                end
+            end
+        end
+    end
+    
+    -- Si solo hay un portal en el mapa, lo tomamos directo (sin importar distancia)
+    if #availablePortals == 1 and humanoidRootPart then
+        local targetPortal = availablePortals[1]
+        humanoidRootPart.CFrame = targetPortal.CFrame
+        task.wait(0.1)
+        if firetouchinterest then
+            firetouchinterest(humanoidRootPart, targetPortal, 0)
+            task.wait(0.1)
+            firetouchinterest(humanoidRootPart, targetPortal, 1)
+        end
+        spawnPosition = nil
+        return true
+    elseif #availablePortals > 1 and humanoidRootPart then
+        -- Si hay más de uno, filtramos para ignorar el que esté cerca de nuestro spawn
+        for _, rootPart in ipairs(availablePortals) do
+            local isExitPortal = true
+            if spawnPosition then
+                local distanceToSpawn = (rootPart.Position - spawnPosition).Magnitude
+                if distanceToSpawn < 50 then -- Entrada
+                    isExitPortal = false
+                end
+            end
+            
+            if isExitPortal then
+                humanoidRootPart.CFrame = rootPart.CFrame
+                task.wait(0.1)
+                if firetouchinterest then
+                    firetouchinterest(humanoidRootPart, rootPart, 0)
+                    task.wait(0.1)
+                    firetouchinterest(humanoidRootPart, rootPart, 1)
+                end
+                spawnPosition = nil
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function RotateTargets()
+    -- Guardamos la posición inicial al activar el script
+    if humanoidRootPart then
+        spawnPosition = humanoidRootPart.Position
+    end
+
     while autoDungeonActive do
         currentTarget = GetClosestEnemy()
         
         if currentTarget then
+            -- Si empezamos a pelear, nos aseguramos de registrar nuestro spawn si no se había guardado
+            if not spawnPosition and humanoidRootPart then
+                spawnPosition = humanoidRootPart.Position
+            end
+            
+            lastTarget = currentTarget
             local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
             local timer = 0
             
-            -- Ataca y se teletransporta al objetivo actual por un máximo de 1 segundo
-            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 1 do
+            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.5 do
                 TeleportToEnemy(currentTarget)
                 AttackEnemy(currentTarget)
                 
-                -- Delay estricto de 0.01 segundos exigido para el Fast Attack
-                wait(0.01)
+                task.wait(0.01)
                 timer = timer + 0.01
             end
         else
-            -- Si no hay enemigos en el mapa, descansa para no congelar el ejecutor
-            wait(0.2)
+            -- Si no hay enemigos, esperamos 1 segundo y buscamos el portal de salida
+            task.wait(1.0)
+            local passed = AutoPassRoom()
+            if not passed then
+                task.wait(0.2) -- Pausa corta para reevaluar si aún no aparece el portal de salida real
+            end
         end
     end
 end
 
--- =============================================================================
--- INTERFAZ GRÁFICA (RAYFIELD UI COMPATIBLE)
--- =============================================================================
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -165,10 +261,11 @@ DungeonTab:CreateToggle({
     Callback = function(Value)
         autoDungeonActive = Value
         if Value then
-            -- Compatibilidad nativa absoluta en Xeno y exploiters antiguos (Evitamos task.spawn)
             coroutine.wrap(RotateTargets)()
         else
             currentTarget = nil
+            lastTarget = nil
+            spawnPosition = nil
             Rayfield:Notify({
                 Title = "⚔️ Edsusito Dungeon ⚔️",
                 Content = "Ciclo de rotación pausado con éxito.",
