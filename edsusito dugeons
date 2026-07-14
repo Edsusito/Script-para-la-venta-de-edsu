@@ -9,14 +9,14 @@ local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
 local hakiYaActivado = false
 local justDied = false 
-local attackHeight = 20 -- Altura inicial por defecto (comienza en 20, pero ahora puedes subirlo hasta 100)
+local attackHeight = 30 -- Altura inicial ajustada a 30 por defecto
 
 -- Evento para cuando el personaje muere y revive
 localPlayer.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
     hakiYaActivado = false 
-    justDied = true 
+    justDied = true -- Activamos bloqueo de enemigos para priorizar el portal
 end)
 
 local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
@@ -93,9 +93,9 @@ local function StartAutoBuffs()
     end)
 end
 
--- Obtener enemigo más cercano
+-- Obtener enemigo más cercano (Bloqueado tras morir)
 local function GetClosestEnemy()
-    if justDied then return nil end
+    if justDied then return nil end -- No busca enemigos si acabamos de morir
 
     local closestEnemy = nil
     local shortestDistance = math.huge
@@ -150,7 +150,6 @@ local function TeleportToEnemy(enemy)
     if not enemyRoot then return false end
     
     local success, err = pcall(function()
-        -- Usamos la variable attackHeight configurada por el slider
         humanoidRootPart.CFrame = enemyRoot.CFrame * CFrame.new(0, attackHeight, 0)
     end)
     
@@ -267,6 +266,7 @@ local function RotateTargets()
             end
         else
             if justDied then
+                -- Bucle de prioridad al portal tras morir
                 local passed = false
                 local attempts = 0
                 while autoDungeonActive and justDied and attempts < 10 do
@@ -335,13 +335,13 @@ DungeonTab:CreateToggle({
 
 DungeonTab:CreateSection("Ajustes de Combate")
 
--- SLIDER DE ALTURA MODIFICADO DE 10 A 100
+-- SLIDER DE ALTURA CONFIGURADO DESDE 10 HASTA 100 (INICIA EN 30)
 DungeonTab:CreateSlider({
     Name = "Altura de Ataque",
-    Range = {10, 100}, -- Modificado: Ahora el mínimo es 10 y el máximo es 100
+    Range = {10, 100}, 
     Increment = 1,
     Suffix = " studs",
-    CurrentValue = 20, -- Sigue iniciando en una altura segura de 20 por defecto
+    CurrentValue = 30, -- Ajustado por defecto a 30 studs
     Flag = "AttackHeightFlag",
     Callback = function(Value)
         attackHeight = Value
