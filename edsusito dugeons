@@ -257,7 +257,7 @@ local function RotateTargets()
             local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
             local timer = 0
             
-            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.5 and not justDied do
+            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.37 and not justDied do
                 TeleportToEnemy(currentTarget)
                 AttackEnemy(currentTarget)
                 
