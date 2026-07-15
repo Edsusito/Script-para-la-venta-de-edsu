@@ -1,22 +1,67 @@
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local localPlayer = Players.LocalPlayer
 local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
-local hakiYaActivado = false
+local autoDungeonActive = false
+local currentTarget = nil
+local lastTarget = nil 
 local justDied = false 
-local attackHeight = 30 -- Altura inicial ajustada a 30 por defecto
+local characterLoaded = true -- Control maestro de carga física
+local attackHeight = 30      -- Altura inicial de ataque
 
--- Evento para cuando el personaje muere y revive
+-- Acceso directo a los eventos de red del juego (Método Pro)
+local commF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+
+-- DETECCIÓN PERFECTA DE HAKI (Busca el objeto oficial de Blox Fruits)
+local function IsHakiActive()
+    if not character then return false end
+    -- "HasBuso" es la marca oficial que pone el juego en tu personaje al activar Haki
+    if character:FindFirstChild("HasBuso") then
+        return true
+    end
+    return false
+end
+
+-- ACTIVACIÓN INSTANTÁNEA POR SERVIDOR (Sin simular teclas)
+local function ForceActivateHaki()
+    if not character or not autoDungeonActive or not characterLoaded then return end
+    
+    -- Si no está activo, le ordenamos directamente al servidor que lo encienda
+    if not IsHakiActive() then
+        pcall(function()
+            commF:InvokeServer("Buso")
+        end)
+    end
+end
+
+-- DETECCIÓN DE REAPARICIÓN ESTRICTA
 localPlayer.CharacterAdded:Connect(function(newCharacter)
+    characterLoaded = false -- Pausa temporal de seguridad
+    justDied = true         -- Prioriza el portal de la sala
+    
+    local humanoid = newCharacter:WaitForChild("Humanoid")
+    local rootPart = newCharacter:WaitForChild("HumanoidRootPart")
+    
+    -- Espera a que el avatar esté completamente dentro del mapa
+    while not (newCharacter.Parent == Workspace and humanoid and rootPart and humanoid.Health > 0 and rootPart.Position.Magnitude > 10) do
+        task.wait(0.1)
+    end
+    
+    -- Un microsegundo para estabilizar las físicas
+    task.wait(0.5) 
+    
     character = newCharacter
-    humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
-    hakiYaActivado = false 
-    justDied = true -- Activamos bloqueo de enemigos para priorizar el portal
+    humanoidRootPart = rootPart
+    characterLoaded = true 
+    
+    -- Activa el Haki al instante de reaparecer
+    if autoDungeonActive then
+        ForceActivateHaki()
+    end
 end)
 
 local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
@@ -24,44 +69,9 @@ local registerAttack = netFolder:WaitForChild("RE/RegisterAttack")
 local registerHit = netFolder:WaitForChild("RE/RegisterHit")
 local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
 
-local autoDungeonActive = false
-local currentTarget = nil
-local lastTarget = nil 
-
--- Detección de Haki (Original)
-local function IsHakiActive()
-    if not character then return false end
-    if character:GetAttribute("Haki") == true or character:GetAttribute("Buso") == true or character:GetAttribute("HasBuso") == true then
-        return true
-    end
-    for _, child in ipairs(character:GetDescendants()) do
-        if child:IsA("BasePart") then
-            if child:FindFirstChild("HasBuso") or child:FindFirstChild("BusoShading") or child.Name == "Buso" then
-                return true
-            end
-        end
-    end
-    return false
-end
-
-local function ForceActivateHaki()
-    if not character or not autoDungeonActive then return end
-    if IsHakiActive() or hakiYaActivado then
-        hakiYaActivado = true 
-        return 
-    end
-    
-    hakiYaActivado = true 
-    task.spawn(function()
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.J, false, game)
-        task.wait(0.1)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.J, false, game)
-    end)
-end
-
 -- Equipar Espada
 local function ForceEquipSword()
-    if not character or not autoDungeonActive then return end
+    if not character or not autoDungeonActive or not characterLoaded then return end
     
     local currentTool = character:FindFirstChildOfClass("Tool")
     if currentTool and (currentTool.ToolTip == "Sword" or string.find(string.lower(currentTool.Name), "sword") or string.find(string.lower(currentTool.Name), "katana")) then
@@ -82,20 +92,20 @@ local function ForceEquipSword()
     end
 end
 
--- Hilo de espada y haki (Original)
+-- Hilo único de buffs (Espada y Haki)
 local function StartAutoBuffs()
     task.spawn(function()
         while autoDungeonActive do
             ForceEquipSword()
             ForceActivateHaki()
-            task.wait(0.3)
+            task.wait(0.3) -- Comprobación constante y limpia cada 0.3 segundos
         end
     end)
 end
 
--- Obtener enemigo más cercano (Ahora ignorando a Blank Buddy)
+-- Obtener enemigo más cercano (Ignorando la Sombra y Blank Buddy)
 local function GetClosestEnemy()
-    if justDied then return nil end -- No busca enemigos si acabamos de morir
+    if justDied or not characterLoaded then return nil end 
 
     local closestEnemy = nil
     local shortestDistance = math.huge
@@ -115,8 +125,9 @@ local function GetClosestEnemy()
         
         for i = 1, #children do
             local object = children[i]
-            -- Agregamos la condición para que pase de largo si ve a tu sombra ("Blank Buddy")
-            if object:IsA("Model") and object ~= currentCharacter and object.Name ~= "Blank Buddy" then
+            
+            -- CONDICIÓN MANTENIDA: Ignora Blank Buddy, Sombra y Shadow
+            if object:IsA("Model") and object ~= currentCharacter and object.Name ~= "Blank Buddy" and object.Name ~= "Sombra" and object.Name ~= "Shadow" then
                 local humanoid = object:FindFirstChildOfClass("Humanoid")
                 local root = object:FindFirstChild("HumanoidRootPart") or object:FindFirstChild("Head")
                 
@@ -145,7 +156,7 @@ local function GetClosestEnemy()
 end
 
 local function TeleportToEnemy(enemy)
-    if not enemy or not enemy.Parent or not humanoidRootPart then return false end
+    if not enemy or not enemy.Parent or not humanoidRootPart or not characterLoaded then return false end
     
     local enemyRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Head")
     if not enemyRoot then return false end
@@ -169,7 +180,7 @@ local function TeleportToEnemy(enemy)
 end
 
 local function AttackEnemy(enemy)
-    if not enemy or not enemy.Parent then return end
+    if not enemy or not enemy.Parent or not characterLoaded then return end
     
     local enemyHead = enemy:FindFirstChild("Head")
     local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
@@ -193,7 +204,7 @@ local function GetCurrentRoomIndex(rooms)
     local minDistanceToRoomCenter = math.huge
     
     for i, room in ipairs(rooms) do
-        local roomPart = room:FindFirstChildOfClass("Part") or room:FindFirstChildOfClass("MeshPart") or room:FindFirst("Floor")
+        local roomPart = room:FindFirstChildOfClass("Part") or room:FindFirstChildOfClass("MeshPart") or room:FindFirstChild("Floor")
         if roomPart then
             local dist = (roomPart.Position - myPos).Magnitude
             if dist < minDistanceToRoomCenter then
@@ -207,6 +218,7 @@ end
 
 -- Lógica de progresión
 local function AutoPassRoom()
+    if not characterLoaded then return false end
     local mapFolder = Workspace:FindFirstChild("Map")
     if not mapFolder then return false end
     local dungeonFolder = mapFolder:FindFirstChild("Dungeon")
@@ -253,12 +265,12 @@ local function RotateTargets()
     while autoDungeonActive do
         currentTarget = GetClosestEnemy()
         
-        if currentTarget and not justDied then
+        if currentTarget and not justDied and characterLoaded then
             lastTarget = currentTarget
             local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
             local timer = 0
             
-            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.37 and not justDied do
+            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.5 and not justDied and characterLoaded do
                 TeleportToEnemy(currentTarget)
                 AttackEnemy(currentTarget)
                 
@@ -266,11 +278,11 @@ local function RotateTargets()
                 timer = timer + 0.01
             end
         else
-            if justDied then
+            if justDied and characterLoaded then
                 -- Bucle de prioridad al portal tras morir
                 local passed = false
                 local attempts = 0
-                while autoDungeonActive and justDied and attempts < 10 do
+                while autoDungeonActive and justDied and attempts < 10 and characterLoaded do
                     passed = AutoPassRoom()
                     if passed then
                         justDied = false 
@@ -284,12 +296,15 @@ local function RotateTargets()
                 end
             else
                 task.wait(1.0)
-                local passed = AutoPassRoom()
-                if not passed then
-                    task.wait(0.5)
+                if characterLoaded then
+                    local passed = AutoPassRoom()
+                    if not passed then
+                        task.wait(0.5)
+                    end
                 end
             end
         end
+        task.wait(0.05)
     end
 end
 
@@ -315,14 +330,12 @@ DungeonTab:CreateToggle({
     Callback = function(Value)
         autoDungeonActive = Value
         if Value then
-            hakiYaActivado = false 
             justDied = false
             StartAutoBuffs() 
             coroutine.wrap(RotateTargets)()
         else
             currentTarget = nil
             lastTarget = nil
-            hakiYaActivado = false
             justDied = false
             Rayfield:Notify({
                 Title = "⚔️ Edsusito Dungeon ⚔️",
