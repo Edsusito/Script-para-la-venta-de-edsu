@@ -1,0 +1,349 @@
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local localPlayer = Players.LocalPlayer
+local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+local hakiYaActivado = false
+local justDied = false 
+local attackHeight = 30 -- Altura inicial ajustada a 30 por defecto
+
+-- Evento para cuando el personaje muere y revive
+localPlayer.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+    humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
+    hakiYaActivado = false 
+    justDied = true -- Activamos bloqueo de enemigos para priorizar el portal
+end)
+
+local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
+local registerAttack = netFolder:WaitForChild("RE/RegisterAttack")
+local registerHit = netFolder:WaitForChild("RE/RegisterHit")
+local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
+
+local autoDungeonActive = false
+local currentTarget = nil
+local lastTarget = nil 
+
+-- Detección de Haki
+local function IsHakiActive()
+    if not character then return false end
+    if character:GetAttribute("Haki") == true or character:GetAttribute("Buso") == true or character:GetAttribute("HasBuso") == true then
+        return true
+    end
+    for _, child in ipairs(character:GetDescendants()) do
+        if child:IsA("BasePart") then
+            if child:FindFirstChild("HasBuso") or child:FindFirstChild("BusoShading") or child.Name == "Buso" then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function ForceActivateHaki()
+    if not character or not autoDungeonActive then return end
+    if IsHakiActive() or hakiYaActivado then
+        hakiYaActivado = true 
+        return 
+    end
+    
+    hakiYaActivado = true 
+    task.spawn(function()
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.J, false, game)
+        task.wait(0.1)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.J, false, game)
+    end)
+end
+
+-- Equipar Espada
+local function ForceEquipSword()
+    if not character or not autoDungeonActive then return end
+    
+    local currentTool = character:FindFirstChildOfClass("Tool")
+    if currentTool and (currentTool.ToolTip == "Sword" or string.find(string.lower(currentTool.Name), "sword") or string.find(string.lower(currentTool.Name), "katana")) then
+        return
+    end
+    
+    local backpack = localPlayer:FindFirstChildOfClass("Backpack")
+    if backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") and (tool.ToolTip == "Sword" or string.find(string.lower(tool.Name), "sword") or string.find(string.lower(tool.Name), "katana")) then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid:EquipTool(tool)
+                    break
+                end
+            end
+        end
+    end
+end
+
+-- Hilo de espada y haki
+local function StartAutoBuffs()
+    task.spawn(function()
+        while autoDungeonActive do
+            ForceEquipSword()
+            ForceActivateHaki()
+            task.wait(0.3)
+        end
+    end)
+end
+
+-- Obtener enemigo más cercano (Bloqueado tras morir)
+local function GetClosestEnemy()
+    if justDied then return nil end -- No busca enemigos si acabamos de morir
+
+    local closestEnemy = nil
+    local shortestDistance = math.huge
+    local currentCharacter = localPlayer.Character
+    
+    if not currentCharacter or not currentCharacter:FindFirstChild("HumanoidRootPart") then 
+        return nil 
+    end
+    
+    local myPos = currentCharacter.HumanoidRootPart.Position
+    local sourceFolder = Workspace:FindFirstChild("Enemies") or enemiesFolder
+    
+    if sourceFolder then
+        local children = sourceFolder:GetChildren()
+        local primaryCandidates = {}
+        local backupCandidates = {}
+        
+        for i = 1, #children do
+            local object = children[i]
+            if object:IsA("Model") and object ~= currentCharacter then
+                local humanoid = object:FindFirstChildOfClass("Humanoid")
+                local root = object:FindFirstChild("HumanoidRootPart") or object:FindFirstChild("Head")
+                
+                if humanoid and humanoid.Health > 0 and root and object.Parent then
+                    local distance = (root.Position - myPos).Magnitude
+                    if object ~= lastTarget then
+                        table.insert(primaryCandidates, {model = object, dist = distance})
+                    else
+                        table.insert(backupCandidates, {model = object, dist = distance})
+                    end
+                end
+            end
+        end
+        
+        local targetList = #primaryCandidates > 0 and primaryCandidates or backupCandidates
+        
+        for i = 1, #targetList do
+            local candidate = targetList[i]
+            if candidate.dist < shortestDistance then
+                shortestDistance = candidate.dist
+                closestEnemy = candidate.model
+            end
+        end
+    end
+    return closestEnemy
+end
+
+local function TeleportToEnemy(enemy)
+    if not enemy or not enemy.Parent or not humanoidRootPart then return false end
+    
+    local enemyRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Head")
+    if not enemyRoot then return false end
+    
+    local success, err = pcall(function()
+        humanoidRootPart.CFrame = enemyRoot.CFrame * CFrame.new(0, attackHeight, 0)
+    end)
+    
+    if not success then
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterDescendantsInstances = {character, enemy}
+        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+        
+        local raycastResult = Workspace:Raycast(enemyRoot.Position, Vector3.new(0, -100, 0), raycastParams)
+        if raycastResult then
+            humanoidRootPart.CFrame = CFrame.new(raycastResult.Position + Vector3.new(0, 3, 0))
+        end
+        return false
+    end
+    return true
+end
+
+local function AttackEnemy(enemy)
+    if not enemy or not enemy.Parent then return end
+    
+    local enemyHead = enemy:FindFirstChild("Head")
+    local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
+    if not enemyHead or not enemyHumanoid then return end
+    
+    local tool = character:FindFirstChildOfClass("Tool")
+    if tool then tool:Activate() end
+    
+    pcall(function()
+        local targetsTable = {{enemy, enemyHead}}
+        registerAttack:FireServer(0)
+        registerHit:FireServer(enemyHead, targetsTable)
+    end)
+end
+
+-- Identifica en qué sala física se encuentra parado el jugador actualmente
+local function GetCurrentRoomIndex(rooms)
+    if not humanoidRootPart then return 1 end
+    local myPos = humanoidRootPart.Position
+    local currentRoomIdx = 1
+    local minDistanceToRoomCenter = math.huge
+    
+    for i, room in ipairs(rooms) do
+        local roomPart = room:FindFirstChildOfClass("Part") or room:FindFirstChildOfClass("MeshPart") or room:FindFirstChild("Floor")
+        if roomPart then
+            local dist = (roomPart.Position - myPos).Magnitude
+            if dist < minDistanceToRoomCenter then
+                minDistanceToRoomCenter = dist
+                currentRoomIdx = i
+            end
+        end
+    end
+    return currentRoomIdx
+end
+
+-- Lógica de progresión
+local function AutoPassRoom()
+    local mapFolder = Workspace:FindFirstChild("Map")
+    if not mapFolder then return false end
+    local dungeonFolder = mapFolder:FindFirstChild("Dungeon")
+    if not dungeonFolder then return false end
+    
+    local rooms = dungeonFolder:GetChildren()
+    if #rooms == 0 then return false end
+    
+    table.sort(rooms, function(a, b)
+        local numA = tonumber(string.match(a.Name, "%d+")) or 0
+        local numB = tonumber(string.match(b.Name, "%d+")) or 0
+        return numA < numB
+    end)
+    
+    local currentRoomIdx = GetCurrentRoomIndex(rooms)
+    local activeRoom = rooms[currentRoomIdx]
+    
+    if activeRoom then
+        local teleporter = activeRoom:FindFirstChild("ExitTeleporter")
+        if teleporter then
+            local rootPart = teleporter:FindFirstChild("Root")
+            if rootPart and rootPart:IsA("BasePart") and humanoidRootPart then
+                local touchTransmitter = rootPart:FindFirstChildOfClass("TouchTransmitter")
+                if touchTransmitter then
+                    humanoidRootPart.CFrame = rootPart.CFrame
+                    task.wait(0.12)
+                    if firetouchinterest then
+                        firetouchinterest(humanoidRootPart, rootPart, 0)
+                        task.wait(0.1)
+                        firetouchinterest(humanoidRootPart, rootPart, 1)
+                    end
+                    if justDied then
+                        justDied = false
+                    end
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function RotateTargets()
+    while autoDungeonActive do
+        currentTarget = GetClosestEnemy()
+        
+        if currentTarget and not justDied then
+            lastTarget = currentTarget
+            local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
+            local timer = 0
+            
+            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.5 and not justDied do
+                TeleportToEnemy(currentTarget)
+                AttackEnemy(currentTarget)
+                
+                task.wait(0.01)
+                timer = timer + 0.01
+            end
+        else
+            if justDied then
+                -- Bucle de prioridad al portal tras morir
+                local passed = false
+                local attempts = 0
+                while autoDungeonActive and justDied and attempts < 10 do
+                    passed = AutoPassRoom()
+                    if passed then
+                        justDied = false 
+                        break
+                    end
+                    attempts = attempts + 1
+                    task.wait(0.5)
+                end
+                if attempts >= 10 then
+                    justDied = false
+                end
+            else
+                task.wait(1.0)
+                local passed = AutoPassRoom()
+                if not passed then
+                    task.wait(0.5)
+                end
+            end
+        end
+    end
+end
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "⚔️ Edsusito Dungeon ⚔️",
+    LoadingTitle = "Iniciando Sistema de Rotación...",
+    LoadingSubtitle = "By Edsu",
+    ConfigurationSaving = { Enabled = false },
+    Discord = { Enabled = false },
+    KeySystem = false
+})
+
+local DungeonTab = Window:CreateTab("Dungeon", 4483362458)
+DungeonTab:CreateSection("Control Principal")
+
+-- BOTÓN TOGGLE PRINCIPAL
+DungeonTab:CreateToggle({
+    Name = "Auto Completar",
+    CurrentValue = false,
+    Flag = "EdsuAutoDungeonFlag",
+    Callback = function(Value)
+        autoDungeonActive = Value
+        if Value then
+            hakiYaActivado = false 
+            justDied = false
+            StartAutoBuffs() 
+            coroutine.wrap(RotateTargets)()
+        else
+            currentTarget = nil
+            lastTarget = nil
+            hakiYaActivado = false
+            justDied = false
+            Rayfield:Notify({
+                Title = "⚔️ Edsusito Dungeon ⚔️",
+                Content = "Ciclo de rotación pausado con éxito.",
+                Duration = 2,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
+DungeonTab:CreateSection("Ajustes de Combate")
+
+-- SLIDER DE ALTURA CONFIGURADO DESDE 10 HASTA 100 (INICIA EN 30)
+DungeonTab:CreateSlider({
+    Name = "Altura de Ataque",
+    Range = {10, 100}, 
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = 30, -- Ajustado por defecto a 30 studs
+    Flag = "AttackHeightFlag",
+    Callback = function(Value)
+        attackHeight = Value
+    end,
+})
