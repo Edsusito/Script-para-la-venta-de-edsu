@@ -28,7 +28,7 @@ local autoDungeonActive = false
 local currentTarget = nil
 local lastTarget = nil 
 
--- Detección de Haki
+-- Detección de Haki (Original)
 local function IsHakiActive()
     if not character then return false end
     if character:GetAttribute("Haki") == true or character:GetAttribute("Buso") == true or character:GetAttribute("HasBuso") == true then
@@ -82,7 +82,7 @@ local function ForceEquipSword()
     end
 end
 
--- Hilo de espada y haki
+-- Hilo de espada y haki (Original)
 local function StartAutoBuffs()
     task.spawn(function()
         while autoDungeonActive do
@@ -93,7 +93,7 @@ local function StartAutoBuffs()
     end)
 end
 
--- Obtener enemigo más cercano (Bloqueado tras morir)
+-- Obtener enemigo más cercano (Ahora ignorando a Blank Buddy)
 local function GetClosestEnemy()
     if justDied then return nil end -- No busca enemigos si acabamos de morir
 
@@ -115,7 +115,8 @@ local function GetClosestEnemy()
         
         for i = 1, #children do
             local object = children[i]
-            if object:IsA("Model") and object ~= currentCharacter then
+            -- Agregamos la condición para que pase de largo si ve a tu sombra ("Blank Buddy")
+            if object:IsA("Model") and object ~= currentCharacter and object.Name ~= "Blank Buddy" then
                 local humanoid = object:FindFirstChildOfClass("Humanoid")
                 local root = object:FindFirstChild("HumanoidRootPart") or object:FindFirstChild("Head")
                 
@@ -192,7 +193,7 @@ local function GetCurrentRoomIndex(rooms)
     local minDistanceToRoomCenter = math.huge
     
     for i, room in ipairs(rooms) do
-        local roomPart = room:FindFirstChildOfClass("Part") or room:FindFirstChildOfClass("MeshPart") or room:FindFirstChild("Floor")
+        local roomPart = room:FindFirstChildOfClass("Part") or room:FindFirstChildOfClass("MeshPart") or room:FindFirst("Floor")
         if roomPart then
             local dist = (roomPart.Position - myPos).Magnitude
             if dist < minDistanceToRoomCenter then
