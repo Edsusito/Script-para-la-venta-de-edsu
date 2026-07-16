@@ -13,7 +13,7 @@ local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local PlayerGui = localPlayer:WaitForChild("PlayerGui")
 
 local justDied = false 
-local attackHeight = 30 -- Altura inicial ajustada a 30 por defecto según el nuevo núcleo[cite: 2]
+local attackHeight = 40 -- Altura inicial ajustada a 40 por defecto según el nuevo núcleo[cite: 2]
 
 -- Variables de la interfaz Premium (MANTENIDAS INTACTAS)
 local v4Enabled = false
@@ -283,7 +283,7 @@ local function RotateTargets()
             local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
             local timer = 0
             
-            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.5 and not justDied do
+            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.35 and not justDied do
                 TeleportToEnemy(currentTarget)
                 AttackEnemy(currentTarget)
                 
@@ -504,7 +504,7 @@ InstructionsTab:CreateParagraph({
 
 InstructionsTab:CreateParagraph({
     Title = "Altura de Ataque 📏",
-    Content = "¿Quieres darles desde el techo o mirarlos a los ojos? Yo lo dejo en 30 por defecto basado en tu última versión, pero tú mandas, ponlo como te sientas más cómodo."
+    Content = "¿Quieres darles desde el techo o mirarlos a los ojos? Yo lo dejo en 40 por defecto basado en tu última versión, pero tú mandas, ponlo como te sientas más cómodo."
 })
 
 InstructionsTab:CreateParagraph({
