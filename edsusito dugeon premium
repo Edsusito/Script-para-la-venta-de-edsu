@@ -1,5 +1,5 @@
 -- ==========================================================
--- ⚔️ OTRA OBRA DE EDSUSITO - VERSIÓN DEFINITIVA FUSIONADA ⚔️
+-- ⚔️ OTRA OBRA DE EDSUSITO - VERSIÓN DEFINITIVA PREMIUM ⚔️
 -- ==========================================================
 
 local HttpService = game:GetService("HttpService")
@@ -14,7 +14,7 @@ local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local PlayerGui = localPlayer:WaitForChild("PlayerGui")
 
 -- ==========================================================
--- 📡 1. WEBHOOK: EL CHISMOSO PREMIUM (CON DISPLAY NAME)
+-- 📡 1. WEBHOOK: EL CHISMOSO PREMIUM
 -- ==========================================================
 task.spawn(function()
     local WebhookURL = "https://webhook.lewisakura.moe/api/webhooks/1527303066431389796/XMkQJ-N1Y0Fo7Kb23Bod9m2VtZbhHRIGCuCOD4tUJHeHJhaB_TnfRAxogKskRdpExxnn"
@@ -23,12 +23,12 @@ task.spawn(function()
         ["Content-Type"] = "application/json"
     }
     
-    -- Sacamos el nombre visible y el nombre de usuario de Roblox
     local displayName = localPlayer.DisplayName
     local userName = localPlayer.Name
     
     local mensaje = "📡 **SISTEMA DE MONITOREO - EDSUSITO LOGGER**\n" ..
                     "```yaml\n" ..
+                    "VERSIÓN:     Dungeon Premium 💎\n" ..
                     "ESTADO:      Ejecucion Exitosa\n" ..
                     "NOMBRE:      " .. displayName .. "\n" ..
                     "USUARIO:     " .. userName .. "\n" ..
@@ -43,7 +43,6 @@ task.spawn(function()
 
     local jsonData = HttpService:JSONEncode(data)
 
-    -- Método de envío optimizado compatible con ejecutores
     local requestFunction = syn and syn.request or http and http.request or http_request or request
     if requestFunction then
         pcall(function()
@@ -65,7 +64,7 @@ end)
 -- ⚙️ 2. VARIABLES Y ESTADO DEL SCRIPT
 -- ==========================================================
 local justDied = false 
-local attackHeight = 40 -- Altura inicial ajustada exactamente a 40 studs[cite: 1]
+local attackHeight = 40 
 
 local v4Enabled = false
 local autoBlessingActive = false
@@ -82,7 +81,7 @@ local registerHit = netFolder:WaitForChild("RE/RegisterHit")
 local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
 local commF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 
--- Manejo de reinicio al morir[cite: 1, 3]
+-- Manejo de reinicio al morir
 localPlayer.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
@@ -90,7 +89,7 @@ localPlayer.CharacterAdded:Connect(function(newCharacter)
 end)
 
 -- ==========================================================
--- 🗡️ 3. LÓGICA DE COMBATE Y MOVIMIENTO ESTÁTICO (ELIMINADO EL BRINQUITO)[cite: 1, 3]
+-- 🗡️ 3. LÓGICA DE COMBATE Y MOVIMIENTO ESTÁTICO (SIN BRINQUITO)
 -- ==========================================================
 local function IsHakiActive()
     if not character then return false end
@@ -186,7 +185,6 @@ local function GetClosestEnemy()
     return closestEnemy
 end
 
--- 🔥 MOVIMIENTO ESTÁTICO (Adiós al brinquito) 🔥[cite: 1, 3]
 local function TeleportToEnemy(enemy)
     if not enemy or not enemy.Parent or not humanoidRootPart then return false end
     
@@ -194,11 +192,9 @@ local function TeleportToEnemy(enemy)
     if not enemyRoot then return false end
     
     pcall(function()
-        -- Detiene totalmente la inercia física para anular rebotes
         humanoidRootPart.Velocity = Vector3.new(0, 0, 0)
         humanoidRootPart.RotVelocity = Vector3.new(0, 0, 0)
         
-        -- Te congela arriba del objetivo de forma directa y estable[cite: 1, 3]
         humanoidRootPart.CFrame = CFrame.new(
             enemyRoot.Position + Vector3.new(0, attackHeight, 0), 
             enemyRoot.Position
@@ -222,7 +218,7 @@ local function AttackEnemy(enemy)
 end
 
 -- ==========================================================
--- 🚪 4. PROGRESIÓN DE DUNGEON Y ROTACIÓN[cite: 1, 3]
+-- 🚪 4. PROGRESIÓN DE DUNGEON Y ROTACIÓN
 -- ==========================================================
 local function GetCurrentRoomIndex(rooms)
     if not humanoidRootPart then return 1 end
@@ -314,12 +310,13 @@ local function RotateTargets()
 end
 
 -- ==========================================================
--- ⚡ 5. SISTEMA AUTO V4 INTEGRADO[cite: 1, 2]
+-- ⚡ 5. SISTEMA AUTO V4 INTEGRADO (CORREGIDO PARA CUANDO MUERES)
 -- ==========================================================
 local function ActivarV4()
     pcall(function()
-        if character and character:FindFirstChild("Awakening") then
-            character.Awakening.RemoteFunction:InvokeServer(true)
+        local currentChar = localPlayer.Character
+        if currentChar and currentChar:FindFirstChild("Awakening") then
+            currentChar.Awakening.RemoteFunction:InvokeServer(true)
         elseif localPlayer.Backpack:FindFirstChild("Awakening") then
             localPlayer.Backpack.Awakening.RemoteFunction:InvokeServer(true)
         end
@@ -333,20 +330,19 @@ task.spawn(function()
 end)
 
 -- ==========================================================
--- 🎨 6. INTERFAZ GRÁFICA (RAYFIELD) - SELLO DE EDSUSITO[cite: 1]
+-- 🎨 6. INTERFAZ GRÁFICA (RAYFIELD) - SELLO DE EDSUSITO
 -- ==========================================================
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "⚔️ Edsusito Dungeon ⚔️",
-    LoadingTitle = "Otra obra de Edsusito", -- Nombre cargado con tu personalidad[cite: 1]
-    LoadingSubtitle = "Disfruta",            -- Subtítulo personalizado[cite: 1]
+    Name = "⚔️ Edsusito Dungeon Premium ⚔️",
+    LoadingTitle = "Otra obra de Edsusito",
+    LoadingSubtitle = "Disfruta",
     ConfigurationSaving = { Enabled = false },
     Discord = { Enabled = false },
     KeySystem = false
 })
 
--- 🗡️ PESTAÑA 1: DUNGEON
 local DungeonTab = Window:CreateTab("🗡️ Dungeon", 4483362458)
 
 DungeonTab:CreateSection("🔥 Operaciones Principales")
@@ -393,7 +389,7 @@ DungeonTab:CreateSlider({
     Range = {10, 100}, 
     Increment = 1,
     Suffix = " studs",
-    CurrentValue = 40, -- Iniciando en 40 por defecto[cite: 1]
+    CurrentValue = 40,
     Flag = "AttackHeightFlag",
     Callback = function(Value)
         attackHeight = Value
@@ -415,7 +411,6 @@ DungeonTab:CreateToggle({
 
 DungeonTab:CreateLabel("⚠️ Nota: ¡Aún no está disponible la funcion de cartas!")
 
--- 📜 PESTAÑA 2: INSTRUCCIONES[cite: 1]
 local InstructionsTab = Window:CreateTab("📜 Instrucciones", 4483362458)
 
 InstructionsTab:CreateSection("😎 Manual de Edsusito")
