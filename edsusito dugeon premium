@@ -386,7 +386,7 @@ DungeonTab:CreateToggle({
     Callback = function(V) autoBlessingActive = V end,
 })
 
-DungeonTab:CreateLabel("⚠️ Nota: ¡Aún no está disponible esta función, pero estoy trabajando en ella!")
+DungeonTab:CreateLabel("⚠️ Nota: ¡Aún no está disponible la funcion de cartas, pero estoy trabajando en ella!")
 
 DungeonTab:CreateParagraph({
     Title = "📜 La Tabla de Leyes (Prioridades)",
