@@ -460,7 +460,7 @@ DungeonTab:CreateSlider({
     Range = {10, 100}, 
     Increment = 1,
     Suffix = " studs",
-    CurrentValue = 30, -- Ajustado por defecto a 30 studs[cite: 2]
+    CurrentValue = 40, -- Ajustado por defecto a 40 studs[cite: 2]
     Flag = "AttackHeightFlag",
     Callback = function(Value)
         attackHeight = Value
