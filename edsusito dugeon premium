@@ -13,7 +13,7 @@ local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local PlayerGui = localPlayer:WaitForChild("PlayerGui")
 
 local justDied = false 
-local attackHeight = 30 -- Altura inicial ajustada a 30 por defecto
+local attackHeight = 40 -- Altura inicial ajustada a 40 por defecto
 
 -- Variables de la interfaz Premium
 local v4Enabled = false
@@ -487,7 +487,7 @@ InstructionsTab:CreateParagraph({
 
 InstructionsTab:CreateParagraph({
     Title = "Altura de Ataque 📏",
-    Content = "¿Quieres darles desde el techo o mirarlos a los ojos? Yo lo dejo en 30 por si acaso para estar bien seguro y no comerme los golpes, pero tú mandas, ponlo como te sientas más cómodo."
+    Content = "¿Quieres darles desde el techo o mirarlos a los ojos? Yo lo dejo en 40 por si acaso para estar bien seguro y no comerme los golpes, pero tú mandas, ponlo como te sientas más cómodo."
 })
 
 InstructionsTab:CreateParagraph({
