@@ -1,0 +1,415 @@
+-- ==========================================================
+-- ⚔️ EDSUSITO DUNGEON - VERSIÓN DEFINITIVA (ARMERÍA + CARTAS PRO) ⚔️
+-- ==========================================================
+
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local localPlayer = Players.LocalPlayer
+local PlayerGui = localPlayer:WaitForChild("PlayerGui")
+
+-- ⚙️ VARIABLES GLOBALES
+local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+local autoDungeonActive = false
+local v4Enabled = false
+local autoBlessingActive = false
+local justDied = false
+local characterLoaded = true
+local attackHeight = 40 
+local selectedWeaponType = "Sword"
+local currentTarget = nil
+local lastTarget = nil
+
+local PriorityList = {"Sword Damage", "Fortress", "Life Steal", "Race Meter", "Defense", "Health", "Energy"}
+
+local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
+local registerAttack = netFolder:WaitForChild("RE/RegisterAttack")
+local registerHit = netFolder:WaitForChild("RE/RegisterHit")
+local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
+local commF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+
+-- 🔄 CONTROL DE REAPARICIÓN
+localPlayer.CharacterAdded:Connect(function(newCharacter)
+    characterLoaded = false
+    justDied = true
+    
+    local humanoid = newCharacter:WaitForChild("Humanoid")
+    local rootPart = newCharacter:WaitForChild("HumanoidRootPart")
+    
+    while not (newCharacter.Parent == Workspace and humanoid and rootPart and humanoid.Health > 0 and rootPart.Position.Magnitude > 10) do
+        task.wait(0.1)
+    end
+    
+    task.wait(0.5)
+    character = newCharacter
+    humanoidRootPart = rootPart
+    characterLoaded = true
+end)
+
+-- 🛡️ FUNCIONES DE COMBATE (HAKI Y ARMAS)
+local function IsHakiActive()
+    return character and character:FindFirstChild("HasBuso") ~= nil
+end
+
+local function ForceActivateHaki()
+    if autoDungeonActive and characterLoaded and not IsHakiActive() then
+        pcall(function() commF:InvokeServer("Buso") end)
+    end
+end
+
+local function ForceEquipWeapon()
+    if not autoDungeonActive or not characterLoaded then return end
+    
+    local currentTool = character:FindFirstChildOfClass("Tool")
+    if currentTool and currentTool.ToolTip == selectedWeaponType then return end
+    
+    local backpack = localPlayer:FindFirstChildOfClass("Backpack")
+    if backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") and tool.ToolTip == selectedWeaponType then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then 
+                    humanoid:EquipTool(tool) 
+                    break 
+                end
+            end
+        end
+    end
+end
+
+-- 🎯 BÚSQUEDA Y ATAQUE DE ENEMIGOS
+local function GetClosestEnemy()
+    if justDied or not characterLoaded then return nil end 
+    local closestEnemy = nil
+    local shortestDistance = math.huge
+    local currentCharacter = localPlayer.Character
+    
+    if not currentCharacter or not currentCharacter:FindFirstChild("HumanoidRootPart") then return nil end
+    local myPos = currentCharacter.HumanoidRootPart.Position
+    local sourceFolder = Workspace:FindFirstChild("Enemies") or enemiesFolder
+    
+    if sourceFolder then
+        local children = sourceFolder:GetChildren()
+        for i = 1, #children do
+            local object = children[i]
+            if object:IsA("Model") and object ~= currentCharacter and object.Name ~= "Blank Buddy" and object.Name ~= "Sombra" and object.Name ~= "Shadow" then
+                local humanoid = object:FindFirstChildOfClass("Humanoid")
+                local root = object:FindFirstChild("HumanoidRootPart") or object:FindFirstChild("Head")
+                
+                if humanoid and humanoid.Health > 0 and root and object.Parent then
+                    local distance = (root.Position - myPos).Magnitude
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestEnemy = object
+                    end
+                end
+            end
+        end
+    end
+    return closestEnemy
+end
+
+local function TeleportToEnemy(enemy)
+    if not enemy or not enemy.Parent or not humanoidRootPart or not characterLoaded then return false end
+    local enemyRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Head")
+    if not enemyRoot then return false end
+    
+    local success = pcall(function()
+        humanoidRootPart.CFrame = enemyRoot.CFrame * CFrame.new(0, attackHeight, 0)
+    end)
+    return success
+end
+
+local function AttackEnemy(enemy)
+    if not enemy or not enemy.Parent or not characterLoaded then return end
+    local enemyHead = enemy:FindFirstChild("Head")
+    if not enemyHead then return end
+    
+    local tool = character:FindFirstChildOfClass("Tool")
+    if tool then tool:Activate() end
+    
+    pcall(function()
+        registerAttack:FireServer(0)
+        registerHit:FireServer(enemyHead, {{enemy, enemyHead}})
+    end)
+end
+
+local function AutoPassRoom()
+    if not characterLoaded or not humanoidRootPart then return false end
+    local mapFolder = Workspace:FindFirstChild("Map")
+    if not mapFolder then return false end
+    local dungeonFolder = mapFolder:FindFirstChild("Dungeon")
+    if not dungeonFolder then return false end
+    
+    local rooms = dungeonFolder:GetChildren()
+    if #rooms == 0 then return false end
+    
+    local myPos = humanoidRootPart.Position
+    local currentRoomIdx = 1
+    local minDistanceToRoomCenter = math.huge
+    
+    for i, room in ipairs(rooms) do
+        local roomPart = room:FindFirstChildOfClass("Part") or room:FindFirstChildOfClass("MeshPart") or room:FindFirstChild("Floor")
+        if roomPart then
+            local dist = (roomPart.Position - myPos).Magnitude
+            if dist < minDistanceToRoomCenter then
+                minDistanceToRoomCenter = dist
+                currentRoomIdx = i
+            end
+        end
+    end
+    
+    local activeRoom = rooms[currentRoomIdx]
+    if activeRoom then
+        local teleporter = activeRoom:FindFirstChild("ExitTeleporter")
+        if teleporter and teleporter:FindFirstChild("Root") then
+            local rootPart = teleporter.Root
+            humanoidRootPart.CFrame = rootPart.CFrame
+            task.wait(0.12)
+            if firetouchinterest then
+                firetouchinterest(humanoidRootPart, rootPart, 0)
+                task.wait(0.1)
+                firetouchinterest(humanoidRootPart, rootPart, 1)
+            end
+            justDied = false
+            return true
+        end
+    end
+    return false
+end
+
+local function RotateTargets()
+    while autoDungeonActive do
+        currentTarget = GetClosestEnemy()
+        if currentTarget and not justDied and characterLoaded then
+            lastTarget = currentTarget
+            local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
+            local timer = 0
+            
+            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.5 and not justDied and characterLoaded do
+                TeleportToEnemy(currentTarget)
+                AttackEnemy(currentTarget)
+                task.wait(0.01)
+                timer = timer + 0.01
+            end
+        else
+            if justDied and characterLoaded then
+                local attempts = 0
+                while autoDungeonActive and justDied and attempts < 10 and characterLoaded do
+                    if AutoPassRoom() then break end
+                    attempts = attempts + 1
+                    task.wait(0.5)
+                end
+                justDied = false
+            else
+                task.wait(1.0)
+                if characterLoaded then AutoPassRoom() end
+            end
+        end
+        task.wait(0.05)
+    end
+end
+
+-- ==========================================================
+-- 🎨 INTERFAZ GRÁFICA RAYFIELD (Cargada antes para usar Notify)
+-- ==========================================================
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "⚔️ Edsusito Dungeon ⚔️",
+    LoadingTitle = "Cargando los poderes...",
+    LoadingSubtitle = "Otra obra de Edsusito jeje",
+    ConfigurationSaving = { Enabled = false },
+    Discord = { Enabled = false },
+    KeySystem = false
+})
+
+-- 🌟 HILOS SECUNDARIOS (Armas, Haki, V4 y Cartas)
+task.spawn(function()
+    while true do
+        if autoDungeonActive then
+            ForceEquipWeapon()
+            ForceActivateHaki()
+        end
+        task.wait(0.2)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if v4Enabled then
+            pcall(function()
+                local char = localPlayer.Character
+                if char and char:FindFirstChild("Awakening") then
+                    char.Awakening.RemoteFunction:InvokeServer(true)
+                elseif localPlayer.Backpack:FindFirstChild("Awakening") then
+                    localPlayer.Backpack.Awakening.RemoteFunction:InvokeServer(true)
+                end
+            end)
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- 🤖 EL CEREBRO DE CARTAS DE EDSUSITO (A prueba de balas)
+task.spawn(function()
+    while true do
+        if autoBlessingActive then
+            local possiblePaths = {
+                PlayerGui:FindFirstChild("BlessingGui"), 
+                PlayerGui:FindFirstChild("ChooseBlessing"),
+                PlayerGui:FindFirstChild("Main") and PlayerGui.Main:FindFirstChild("ChooseBlessing")
+            }
+            
+            for _, gui in ipairs(possiblePaths) do
+                if gui and gui.Enabled then
+                    local container = gui:FindFirstChild("Buttons") or gui:FindFirstChild("Container") or gui:FindFirstChild("Frame")
+                    
+                    if container then
+                        for _, priorityName in ipairs(PriorityList) do
+                            -- Edsusito limpia los espacios de tu lista
+                            local prioridadLimpia = string.gsub(string.upper(priorityName), " ", "")
+                            
+                            for _, button in ipairs(container:GetChildren()) do
+                                if button:IsA("TextButton") or button:IsA("ImageButton") or button:IsA("Frame") then
+                                    
+                                    -- Recolectamos todo el texto oculto
+                                    local textoCarta = button.Name
+                                    for _, desc in ipairs(button:GetDescendants()) do
+                                        if desc:IsA("TextLabel") then
+                                            textoCarta = textoCarta .. desc.Text
+                                        end
+                                    end
+                                    
+                                    -- Edsusito limpia los espacios del juego
+                                    local textLimpio = string.gsub(string.upper(textoCarta), " ", "")
+                                    
+                                    -- Comprobación maestra
+                                    if string.find(textLimpio, prioridadLimpia) then
+                                        pcall(function() 
+                                            local clickTarget = button
+                                            if button:IsA("Frame") then
+                                                clickTarget = button:FindFirstChildOfClass("TextButton") or button
+                                            end
+                                            
+                                            clickTarget.MouseButton1Click:Fire() 
+                                            if clickTarget:IsA("TextButton") or clickTarget:IsA("ImageButton") then
+                                                clickTarget.Activated:Fire() 
+                                            end
+                                        end)
+                                        
+                                        -- Notificación para que sepas qué agarró
+                                        Rayfield:Notify({
+                                            Title = "🤖 Carta Atrapada",
+                                            Content = "Tu Edsusito eligió: " .. priorityName .. " 🎯",
+                                            Duration = 4,
+                                            Image = 4483362458,
+                                        })
+                                        
+                                        task.wait(2) 
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(0.3)
+    end
+end)
+
+
+-- 🗡️ PESTAÑA 1: DUNGEON
+local DungeonTab = Window:CreateTab("🗡️ Dungeon", 4483362458)
+
+DungeonTab:CreateSection("🔥 Operaciones Principales")
+DungeonTab:CreateToggle({
+    Name = "Auto Completar Dungeon ⚔️",
+    CurrentValue = false,
+    Flag = "EdsuAutoDungeonFlag",
+    Callback = function(V)
+        autoDungeonActive = V
+        if V then coroutine.wrap(RotateTargets)() end
+    end,
+})
+
+DungeonTab:CreateSection("🎒 Armería de Edsu")
+DungeonTab:CreateDropdown({
+    Name = "Selecciona tu Arma",
+    Options = {"Espada", "Combate (Melee)"},
+    CurrentOption = {"Espada"},
+    MultipleOptions = false,
+    Flag = "WeaponSelect",
+    Callback = function(Option)
+        local choice = type(Option) == "table" and Option[1] or Option
+        if choice == "Espada" then
+            selectedWeaponType = "Sword"
+        elseif choice == "Combate (Melee)" then
+            selectedWeaponType = "Melee"
+        end
+    end,
+})
+
+DungeonTab:CreateSlider({
+    Name = "Altura de Ataque 📏",
+    Range = {10, 100},
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = 40,
+    Flag = "AttackHeightFlag",
+    Callback = function(Value) attackHeight = Value end,
+})
+
+DungeonTab:CreateSection("✨ Cositas Mágicas")
+DungeonTab:CreateToggle({
+    Name = "Auto V4 (A la velocidad de la luz) ⚡",
+    CurrentValue = false,
+    Callback = function(V) v4Enabled = V end,
+})
+
+DungeonTab:CreateToggle({
+    Name = "Auto Elegir Cartas (Sin pensar mucho) 🤖",
+    CurrentValue = false,
+    Callback = function(V) autoBlessingActive = V end,
+})
+
+DungeonTab:CreateParagraph({
+    Title = "📜 La Tabla de Leyes (Prioridades)",
+    Content = "1. 🗡️ Sword Damage\n2. 🛡️ Fortress\n3. 🩸 Life Steal\n4. ⚡ Race Meter\n5. 🏗️ Defense\n6. ❤️ Health\n7. 🔋 Energy"
+})
+
+
+-- 📜 PESTAÑA 2: INSTRUCCIONES
+local InstructionsTab = Window:CreateTab("📜 Instrucciones", 4483362458)
+
+InstructionsTab:CreateSection("😎 Manual de Edsusito")
+InstructionsTab:CreateParagraph({
+    Title = "Auto Completar Dungeon ⚔️",
+    Content = "Tú solo enciéndelo y deja que la magia ocurra. Mientras el bot hace el trabajo sucio saltando de sala en sala, tú puedes ir por un pancito. Si ves a alguien sufriendo en la dungeon, dile: 'te falta tu edsusito jeje'."
+})
+
+InstructionsTab:CreateParagraph({
+    Title = "Armería (Espada o Combate) 🎒",
+    Content = "¡Nuevo juguete! Ahora puedes elegir con qué quieres repartir golpes. Elige 'Espada' si quieres cortar o 'Combate' si quieres subir tu estilo de pelea a puro puño. El script obligará a tu personaje a no soltar el arma."
+})
+
+InstructionsTab:CreateParagraph({
+    Title = "Altura de Ataque 📏",
+    Content = "¿Quieres darles desde el techo o mirarlos a los ojos? Yo lo dejo en 40 por si acaso para estar bien seguro y no comerme los golpes, pero tú mandas, ponlo como te sientas más cómodo."
+})
+
+InstructionsTab:CreateParagraph({
+    Title = "Auto V4 ⚡",
+    Content = "Apenas se llene esa barrita morada, ¡pum! Nos transformamos. Cero estrés, el bot apretará el botón más rápido que cualquiera."
+})
+
+InstructionsTab:CreateParagraph({
+    Title = "Auto Elegir Cartas 🤖",
+    Content = "Tranquilo, yo me encargo de leer por ti. Seguiré la tabla de leyes al pie de la letra para que siempre te toque lo más chetado. Además, ahora te mandaré una notificación en la pantalla avisándote cuál elegí. ¡Así no pierdes tiempo revisando!"
+})
+
+InstructionsTab:CreateSection("🔧 Regla de Oro")
+InstructionsTab:CreateLabel("Si algo se bugea (ya sabes cómo es Roblox), apaga y prende los toggles. Truco viejo pero infalible jeje.")
