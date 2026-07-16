@@ -1,5 +1,5 @@
 -- ==========================================================
--- ⚔️ EDSUSITO DUNGEON - VERSIÓN DEFINITIVA (NÚCLEO GRATIS + UI PREMIUM) ⚔️
+-- ⚔️ EDSUSITO DUNGEON - VERSIÓN DEFINITIVA FUSIONADA ⚔️
 -- ==========================================================
 
 local Workspace = game:GetService("Workspace")
@@ -13,32 +13,34 @@ local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local PlayerGui = localPlayer:WaitForChild("PlayerGui")
 
 local justDied = false 
-local attackHeight = 40 -- Altura inicial ajustada a 40 por defecto
+local attackHeight = 30 -- Altura inicial ajustada a 30 por defecto según el nuevo núcleo[cite: 2]
 
--- Variables de la interfaz Premium
+-- Variables de la interfaz Premium (MANTENIDAS INTACTAS)
 local v4Enabled = false
 local autoBlessingActive = false
 local selectedWeaponType = "Sword"
 local PriorityList = {"Sword Damage", "Fortress", "Life Steal", "Race Meter", "Defense", "Health", "Energy"}
 
--- Evento para cuando el personaje muere y revive (NÚCLEO GRATIS)
+-- Evento para cuando el personaje muere y revive[cite: 2]
 localPlayer.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
-    justDied = true -- Activamos bloqueo de enemigos para priorizar el portal
+    justDied = true -- Activamos bloqueo de enemigos para priorizar el portal[cite: 2]
 end)
 
 local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
 local registerAttack = netFolder:WaitForChild("RE/RegisterAttack")
 local registerHit = netFolder:WaitForChild("RE/RegisterHit")
 local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
+
+-- Acceso directo a los eventos de red del juego[cite: 2]
 local commF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 
 local autoDungeonActive = false
 local currentTarget = nil
 local lastTarget = nil 
 
--- Detección de Haki Real
+-- Detección de Haki Real[cite: 2]
 local function IsHakiActive()
     if not character then return false end
     if character:FindFirstChild("HasBuso") then
@@ -47,9 +49,11 @@ local function IsHakiActive()
     return false
 end
 
--- Activación de Haki Obligatoria por Servidor
+-- Activación de Haki Obligatoria por Servidor[cite: 2]
 local function ForceActivateHaki()
     if not character or not autoDungeonActive then return end
+    
+    -- Si NO está activo el Haki, lo forzamos de inmediato[cite: 2]
     if not IsHakiActive() then
         pcall(function()
             commF:InvokeServer("Buso")
@@ -57,7 +61,7 @@ local function ForceActivateHaki()
     end
 end
 
--- Equipar Arma (Adaptado para soportar el Dropdown Premium)
+-- Equipar Arma (MANTENIDO INTACTO PARA SOPORTAR ESPADA Y MELEE)
 local function ForceEquipWeapon()
     if not character or not autoDungeonActive then return end
     
@@ -93,25 +97,28 @@ local function ForceEquipWeapon()
     end
 end
 
--- Hilos de auto-buffs independientes (NÚCLEO GRATIS)
+-- Hilos de auto-buffs independientes para máxima velocidad[cite: 2]
 local function StartAutoBuffs()
+    -- Hilo exclusivo del arma (revisa cada 0.3 segundos)[cite: 2]
     task.spawn(function()
         while autoDungeonActive do
             ForceEquipWeapon()
             task.wait(0.3)
         end
     end)
+    
+    -- Hilo ultra-rápido exclusivo para el Haki (comprueba cada 0.1 segundos)[cite: 2]
     task.spawn(function()
         while autoDungeonActive do
             ForceActivateHaki()
-            task.wait(0.1) 
+            task.wait(0.1) -- Tiempo de reacción casi instantáneo si se desactiva[cite: 2]
         end
     end)
 end
 
--- Obtener enemigo más cercano (NÚCLEO GRATIS)
+-- Obtener enemigo más cercano (Bloqueado tras morir + Filtro de Sombra/Blank Buddy)[cite: 2]
 local function GetClosestEnemy()
-    if justDied then return nil end
+    if justDied then return nil end -- No busca enemigos si acabamos de morir[cite: 2]
 
     local closestEnemy = nil
     local shortestDistance = math.huge
@@ -132,6 +139,7 @@ local function GetClosestEnemy()
         for i = 1, #children do
             local object = children[i]
             
+            -- EXCLUSIÓN: Ignoramos Blank Buddy, Sombra y Shadow[cite: 2]
             if object:IsA("Model") and object ~= currentCharacter and object.Name ~= "Blank Buddy" and object.Name ~= "Sombra" and object.Name ~= "Shadow" then
                 local humanoid = object:FindFirstChildOfClass("Humanoid")
                 local root = object:FindFirstChild("HumanoidRootPart") or object:FindFirstChild("Head")
@@ -148,6 +156,7 @@ local function GetClosestEnemy()
         end
         
         local targetList = #primaryCandidates > 0 and primaryCandidates or backupCandidates
+        
         for i = 1, #targetList do
             local candidate = targetList[i]
             if candidate.dist < shortestDistance then
@@ -200,7 +209,7 @@ local function AttackEnemy(enemy)
     end)
 end
 
--- Identifica en qué sala física se encuentra parado (NÚCLEO GRATIS)
+-- Identifica en qué sala física se encuentra parado el jugador actualmente[cite: 2]
 local function GetCurrentRoomIndex(rooms)
     if not humanoidRootPart then return 1 end
     local myPos = humanoidRootPart.Position
@@ -220,7 +229,7 @@ local function GetCurrentRoomIndex(rooms)
     return currentRoomIdx
 end
 
--- Lógica de progresión (NÚCLEO GRATIS)
+-- Lógica de progresión[cite: 2]
 local function AutoPassRoom()
     local mapFolder = Workspace:FindFirstChild("Map")
     if not mapFolder then return false end
@@ -264,7 +273,7 @@ local function AutoPassRoom()
     return false
 end
 
--- CICLO DE ATAQUE (NÚCLEO GRATIS - Temporizador de 0.5s intacto)
+-- Ciclo de combate usando el temporizador < 0.5s[cite: 2]
 local function RotateTargets()
     while autoDungeonActive do
         currentTarget = GetClosestEnemy()
@@ -274,7 +283,7 @@ local function RotateTargets()
             local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
             local timer = 0
             
-            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.37 and not justDied do
+            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.5 and not justDied do
                 TeleportToEnemy(currentTarget)
                 AttackEnemy(currentTarget)
                 
@@ -283,6 +292,7 @@ local function RotateTargets()
             end
         else
             if justDied then
+                -- Bucle de prioridad al portal tras morir[cite: 2]
                 local passed = false
                 local attempts = 0
                 while autoDungeonActive and justDied and attempts < 10 do
@@ -309,24 +319,31 @@ local function RotateTargets()
 end
 
 -- ==========================================================
--- ⚡ HILOS AGREGADOS PREMIUM (AUTO V4 Y CARTAS) ⚡
+-- ⚡ LÓGICA DE AUTO V4 EXACTA A LA SOLICITADA ⚡
 -- ==========================================================
-task.spawn(function()
-    while true do
-        if v4Enabled then
-            pcall(function()
-                local char = localPlayer.Character
-                if char and char:FindFirstChild("Awakening") then
-                    char.Awakening.RemoteFunction:InvokeServer(true)
-                elseif localPlayer.Backpack:FindFirstChild("Awakening") then
-                    localPlayer.Backpack.Awakening.RemoteFunction:InvokeServer(true)
-                end
-            end)
+
+-- Función principal de activación[cite: 1]
+local function ActivarV4()
+    pcall(function()
+        local char = localPlayer.Character
+        if char and char:FindFirstChild("Awakening") then
+            char.Awakening.RemoteFunction:InvokeServer(true)
+        elseif localPlayer.Backpack:FindFirstChild("Awakening") then
+            localPlayer.Backpack.Awakening.RemoteFunction:InvokeServer(true)
         end
-        task.wait(0.5)
+    end)
+end
+
+-- Bucle de auto-activación[cite: 1]
+task.spawn(function()
+    while task.wait(1) do -- Revisa cada segundo[cite: 1]
+        if v4Enabled then
+            ActivarV4()
+        end
     end
 end)
 
+-- Sistema de cartas (🚧 EN CONSTRUCCIÓN)
 task.spawn(function()
     while true do
         if autoBlessingActive then
@@ -386,8 +403,8 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
     Name = "⚔️ Edsusito Dungeon ⚔️",
-    LoadingTitle = "Cargando los poderes...",
-    LoadingSubtitle = "Otra obra de Edsusito jeje",
+    LoadingTitle = "Iniciando Sistema de Rotación...",
+    LoadingSubtitle = "By Edsu",
     ConfigurationSaving = { Enabled = false },
     Discord = { Enabled = false },
     KeySystem = false
@@ -443,7 +460,7 @@ DungeonTab:CreateSlider({
     Range = {10, 100}, 
     Increment = 1,
     Suffix = " studs",
-    CurrentValue = 30,
+    CurrentValue = 30, -- Ajustado por defecto a 30 studs[cite: 2]
     Flag = "AttackHeightFlag",
     Callback = function(Value)
         attackHeight = Value
@@ -487,12 +504,12 @@ InstructionsTab:CreateParagraph({
 
 InstructionsTab:CreateParagraph({
     Title = "Altura de Ataque 📏",
-    Content = "¿Quieres darles desde el techo o mirarlos a los ojos? Yo lo dejo en 40 por si acaso para estar bien seguro y no comerme los golpes, pero tú mandas, ponlo como te sientas más cómodo."
+    Content = "¿Quieres darles desde el techo o mirarlos a los ojos? Yo lo dejo en 30 por defecto basado en tu última versión, pero tú mandas, ponlo como te sientas más cómodo."
 })
 
 InstructionsTab:CreateParagraph({
     Title = "Auto V4 ⚡",
-    Content = "Apenas se llene esa barrita morada, ¡pum! Nos transformamos. Cero estrés, el bot apretará el botón más rápido que cualquiera."
+    Content = "Apenas se llene esa barrita morada, ¡pum! Nos transformamos. Cero estrés, el bot apretará el botón internamente más rápido que cualquiera."
 })
 
 InstructionsTab:CreateParagraph({
