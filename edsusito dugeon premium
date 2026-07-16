@@ -273,7 +273,7 @@ local function AutoPassRoom()
     return false
 end
 
--- Ciclo de combate usando el temporizador < 0.5s[cite: 2]
+-- Ciclo de combate usando el temporizador < 0.35s[cite: 2]
 local function RotateTargets()
     while autoDungeonActive do
         currentTarget = GetClosestEnemy()
