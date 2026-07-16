@@ -376,6 +376,9 @@ DungeonTab:CreateToggle({
     Callback = function(V) autoBlessingActive = V end,
 })
 
+-- NOTA AÑADIDA AQUÍ
+DungeonTab:CreateLabel("⚠️ Nota: ¡Aún no está disponible esta función, pero estoy trabajando en ella!")
+
 DungeonTab:CreateParagraph({
     Title = "📜 La Tabla de Leyes (Prioridades)",
     Content = "1. 🗡️ Sword Damage\n2. 🛡️ Fortress\n3. 🩸 Life Steal\n4. ⚡ Race Meter\n5. 🏗️ Defense\n6. ❤️ Health\n7. 🔋 Energy"
@@ -406,9 +409,10 @@ InstructionsTab:CreateParagraph({
     Content = "Apenas se llene esa barrita morada, ¡pum! Nos transformamos. Cero estrés, el bot apretará el botón más rápido que cualquiera."
 })
 
+-- PÁRRAFO MODIFICADO CON LA NOTA
 InstructionsTab:CreateParagraph({
-    Title = "Auto Elegir Cartas 🤖",
-    Content = "Tranquilo, yo me encargo de leer por ti. Seguiré la tabla de leyes al pie de la letra para que siempre te toque lo más chetado. Además, ahora te mandaré una notificación en la pantalla avisándote cuál elegí. ¡Así no pierdes tiempo revisando!"
+    Title = "Auto Elegir Cartas 🤖 (🚧 EN CONSTRUCCIÓN)",
+    Content = "⚠️ NOTA: Aún no tengo disponible la parte de auto elegir cartas, ¡pero estoy trabajando en ella a toda máquina! Muy pronto yo me encargaré de leer por ti y elegir lo más chetado para que no pierdas tiempo. ¡Paciencia jeje!"
 })
 
 InstructionsTab:CreateSection("🔧 Regla de Oro")
