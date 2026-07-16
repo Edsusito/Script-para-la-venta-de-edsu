@@ -1,5 +1,5 @@
 -- ==========================================================
--- ⚔️ EDSUSITO DUNGEON - VERSIÓN DEFINITIVA (ARMERÍA + CARTAS PRO) ⚔️
+-- ⚔️ EDSUSITO DUNGEON - VERSIÓN DEFINITIVA (ARMERÍA + CARTAS PRO + FIX REAPARICIÓN) ⚔️
 -- ==========================================================
 
 local Workspace = game:GetService("Workspace")
@@ -17,7 +17,7 @@ local v4Enabled = false
 local autoBlessingActive = false
 local justDied = false
 local characterLoaded = true
-local attackHeight = 40 
+local attackHeight = 30 -- Ajustado a 30 por defecto como querías
 local selectedWeaponType = "Sword"
 local currentTarget = nil
 local lastTarget = nil
@@ -30,21 +30,15 @@ local registerHit = netFolder:WaitForChild("RE/RegisterHit")
 local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
 local commF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 
--- 🔄 CONTROL DE REAPARICIÓN
+-- 🔄 CONTROL DE REAPARICIÓN (Arreglado con la lógica de la versión gratis)
 localPlayer.CharacterAdded:Connect(function(newCharacter)
     characterLoaded = false
     justDied = true
     
-    local humanoid = newCharacter:WaitForChild("Humanoid")
-    local rootPart = newCharacter:WaitForChild("HumanoidRootPart")
-    
-    while not (newCharacter.Parent == Workspace and humanoid and rootPart and humanoid.Health > 0 and rootPart.Position.Magnitude > 10) do
-        task.wait(0.1)
-    end
-    
-    task.wait(0.5)
     character = newCharacter
-    humanoidRootPart = rootPart
+    humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart", 5)
+    
+    task.wait(0.5) -- Pequeño respiro para que el juego estabilice tu personaje
     characterLoaded = true
 end)
 
@@ -136,16 +130,9 @@ local function AttackEnemy(enemy)
     end)
 end
 
-local function AutoPassRoom()
-    if not characterLoaded or not humanoidRootPart then return false end
-    local mapFolder = Workspace:FindFirstChild("Map")
-    if not mapFolder then return false end
-    local dungeonFolder = mapFolder:FindFirstChild("Dungeon")
-    if not dungeonFolder then return false end
-    
-    local rooms = dungeonFolder:GetChildren()
-    if #rooms == 0 then return false end
-    
+-- Identifica en qué sala física se encuentra parado el jugador (Importado del script gratis)
+local function GetCurrentRoomIndex(rooms)
+    if not humanoidRootPart then return 1 end
     local myPos = humanoidRootPart.Position
     local currentRoomIdx = 1
     local minDistanceToRoomCenter = math.huge
@@ -160,21 +147,48 @@ local function AutoPassRoom()
             end
         end
     end
+    return currentRoomIdx
+end
+
+-- Lógica de portales ultra efectiva de la versión gratis
+local function AutoPassRoom()
+    if not characterLoaded or not humanoidRootPart then return false end
+    local mapFolder = Workspace:FindFirstChild("Map")
+    if not mapFolder then return false end
+    local dungeonFolder = mapFolder:FindFirstChild("Dungeon")
+    if not dungeonFolder then return false end
     
+    local rooms = dungeonFolder:GetChildren()
+    if #rooms == 0 then return false end
+    
+    -- Ordenar las salas para que el script no se confunda
+    table.sort(rooms, function(a, b)
+        local numA = tonumber(string.match(a.Name, "%d+")) or 0
+        local numB = tonumber(string.match(b.Name, "%d+")) or 0
+        return numA < numB
+    end)
+    
+    local currentRoomIdx = GetCurrentRoomIndex(rooms)
     local activeRoom = rooms[currentRoomIdx]
+    
     if activeRoom then
         local teleporter = activeRoom:FindFirstChild("ExitTeleporter")
-        if teleporter and teleporter:FindFirstChild("Root") then
-            local rootPart = teleporter.Root
-            humanoidRootPart.CFrame = rootPart.CFrame
-            task.wait(0.12)
-            if firetouchinterest then
-                firetouchinterest(humanoidRootPart, rootPart, 0)
-                task.wait(0.1)
-                firetouchinterest(humanoidRootPart, rootPart, 1)
+        if teleporter then
+            local rootPart = teleporter:FindFirstChild("Root")
+            if rootPart and humanoidRootPart then
+                local touchTransmitter = rootPart:FindFirstChildOfClass("TouchTransmitter")
+                if touchTransmitter then
+                    humanoidRootPart.CFrame = rootPart.CFrame
+                    task.wait(0.12)
+                    if firetouchinterest then
+                        firetouchinterest(humanoidRootPart, rootPart, 0)
+                        task.wait(0.1)
+                        firetouchinterest(humanoidRootPart, rootPart, 1)
+                    end
+                    if justDied then justDied = false end
+                    return true
+                end
             end
-            justDied = false
-            return true
         end
     end
     return false
@@ -196,9 +210,11 @@ local function RotateTargets()
             end
         else
             if justDied and characterLoaded then
+                local passed = false
                 local attempts = 0
                 while autoDungeonActive and justDied and attempts < 10 and characterLoaded do
-                    if AutoPassRoom() then break end
+                    passed = AutoPassRoom()
+                    if passed then break end
                     attempts = attempts + 1
                     task.wait(0.5)
                 end
@@ -213,7 +229,7 @@ local function RotateTargets()
 end
 
 -- ==========================================================
--- 🎨 INTERFAZ GRÁFICA RAYFIELD (Cargada antes para usar Notify)
+-- 🎨 INTERFAZ GRÁFICA RAYFIELD 
 -- ==========================================================
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
@@ -233,7 +249,7 @@ task.spawn(function()
             ForceEquipWeapon()
             ForceActivateHaki()
         end
-        task.wait(0.2)
+        task.wait(0.1) -- Más rápido como en la versión gratis
     end
 end)
 
@@ -253,7 +269,7 @@ task.spawn(function()
     end
 end)
 
--- 🤖 EL CEREBRO DE CARTAS DE EDSUSITO (A prueba de balas)
+-- 🤖 EL CEREBRO DE CARTAS DE EDSUSITO
 task.spawn(function()
     while true do
         if autoBlessingActive then
@@ -269,13 +285,10 @@ task.spawn(function()
                     
                     if container then
                         for _, priorityName in ipairs(PriorityList) do
-                            -- Edsusito limpia los espacios de tu lista
                             local prioridadLimpia = string.gsub(string.upper(priorityName), " ", "")
                             
                             for _, button in ipairs(container:GetChildren()) do
                                 if button:IsA("TextButton") or button:IsA("ImageButton") or button:IsA("Frame") then
-                                    
-                                    -- Recolectamos todo el texto oculto
                                     local textoCarta = button.Name
                                     for _, desc in ipairs(button:GetDescendants()) do
                                         if desc:IsA("TextLabel") then
@@ -283,10 +296,8 @@ task.spawn(function()
                                         end
                                     end
                                     
-                                    -- Edsusito limpia los espacios del juego
                                     local textLimpio = string.gsub(string.upper(textoCarta), " ", "")
                                     
-                                    -- Comprobación maestra
                                     if string.find(textLimpio, prioridadLimpia) then
                                         pcall(function() 
                                             local clickTarget = button
@@ -300,7 +311,6 @@ task.spawn(function()
                                             end
                                         end)
                                         
-                                        -- Notificación para que sepas qué agarró
                                         Rayfield:Notify({
                                             Title = "🤖 Carta Atrapada",
                                             Content = "Tu Edsusito eligió: " .. priorityName .. " 🎯",
@@ -358,7 +368,7 @@ DungeonTab:CreateSlider({
     Range = {10, 100},
     Increment = 1,
     Suffix = " studs",
-    CurrentValue = 40,
+    CurrentValue = 30,
     Flag = "AttackHeightFlag",
     Callback = function(Value) attackHeight = Value end,
 })
@@ -376,7 +386,6 @@ DungeonTab:CreateToggle({
     Callback = function(V) autoBlessingActive = V end,
 })
 
--- NOTA AÑADIDA AQUÍ
 DungeonTab:CreateLabel("⚠️ Nota: ¡Aún no está disponible esta función, pero estoy trabajando en ella!")
 
 DungeonTab:CreateParagraph({
@@ -391,29 +400,25 @@ local InstructionsTab = Window:CreateTab("📜 Instrucciones", 4483362458)
 InstructionsTab:CreateSection("😎 Manual de Edsusito")
 InstructionsTab:CreateParagraph({
     Title = "Auto Completar Dungeon ⚔️",
-    Content = "Tú solo enciéndelo y deja que la magia ocurra. Mientras el bot hace el trabajo sucio saltando de sala en sala, tú puedes ir por un pancito. Si ves a alguien sufriendo en la dungeon, dile: 'te falta tu edsusito jeje'."
+    Content = "Tú solo enciéndelo y deja que la magia ocurra. Mientras el bot hace el trabajo sucio saltando de sala en sala, tú puedes ir por un pancito."
 })
 
 InstructionsTab:CreateParagraph({
     Title = "Armería (Espada o Combate) 🎒",
-    Content = "¡Nuevo juguete! Ahora puedes elegir con qué quieres repartir golpes. Elige 'Espada' si quieres cortar o 'Combate' si quieres subir tu estilo de pelea a puro puño. El script obligará a tu personaje a no soltar el arma."
+    Content = "¡Nuevo juguete! Ahora puedes elegir con qué quieres repartir golpes. Elige 'Espada' si quieres cortar o 'Combate' si quieres subir tu estilo de pelea a puro puño."
 })
 
 InstructionsTab:CreateParagraph({
     Title = "Altura de Ataque 📏",
-    Content = "¿Quieres darles desde el techo o mirarlos a los ojos? Yo lo dejo en 40 por si acaso para estar bien seguro y no comerme los golpes, pero tú mandas, ponlo como te sientas más cómodo."
+    Content = "¿Quieres darles desde el techo o mirarlos a los ojos? Viene en 30 por defecto, pero ponlo como te sientas más cómodo."
 })
 
 InstructionsTab:CreateParagraph({
     Title = "Auto V4 ⚡",
-    Content = "Apenas se llene esa barrita morada, ¡pum! Nos transformamos. Cero estrés, el bot apretará el botón más rápido que cualquiera."
+    Content = "Apenas se llene esa barrita morada, ¡pum! Nos transformamos. Cero estrés."
 })
 
--- PÁRRAFO MODIFICADO CON LA NOTA
 InstructionsTab:CreateParagraph({
     Title = "Auto Elegir Cartas 🤖 (🚧 EN CONSTRUCCIÓN)",
-    Content = "⚠️ NOTA: Aún no tengo disponible la parte de auto elegir cartas, ¡pero estoy trabajando en ella a toda máquina! Muy pronto yo me encargaré de leer por ti y elegir lo más chetado para que no pierdas tiempo. ¡Paciencia jeje!"
+    Content = "⚠️ NOTA: Aún no tengo disponible la parte de auto elegir cartas, ¡pero estoy trabajando en ella a toda máquina! Muy pronto yo me encargaré de leer por ti."
 })
-
-InstructionsTab:CreateSection("🔧 Regla de Oro")
-InstructionsTab:CreateLabel("Si algo se bugea (ya sabes cómo es Roblox), apaga y prende los toggles. Truco viejo pero infalible jeje.")
