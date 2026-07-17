@@ -5,7 +5,7 @@
 local UsuariosPermitidos = {
     [7255753286] = true,  -- TW_Calamity
     [2014903362] = true,  -- Edsusito
-    [000000000] = true,   -- Espacio 3
+    [8117327541] = true,   -- MC_AleX
     [000000000] = true,   -- Espacio 4
     [000000000] = true,   -- Espacio 5
     [000000000] = true,   -- Espacio 6
