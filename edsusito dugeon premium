@@ -7,7 +7,7 @@ local UsuariosPermitidos = {
     [2014903362] = true,  -- Edsusito (Creador)
     [8117327541] = true,  -- MC_AleX
     [4121727989] = true,   -- SAMZzz
-    [000000000] = true,   -- Espacio 5
+    [8019265589] = true,   -- azeus
     [000000000] = true,   -- Espacio 6
     [000000000] = true,   -- Espacio 7
     [000000000] = true,   -- Espacio 8
@@ -223,15 +223,6 @@ local function GetClosestEnemy()
     local sourceFolder = Workspace:FindFirstChild("Enemies") or enemiesFolder
     
     if sourceFolder then
-        local jefeVivo = false
-        local jefeEncontrado = sourceFolder:FindFirstChild("Gas Knight")
-        if jefeEncontrado then
-            local jefeHumanoid = jefeEncontrado:FindFirstChildOfClass("Humanoid")
-            if jefeHumanoid and jefeHumanoid.Health > 0 then
-                jefeVivo = true
-            end
-        end
-
         local children = sourceFolder:GetChildren()
         local primaryCandidates = {}
         local backupCandidates = {}
@@ -239,7 +230,8 @@ local function GetClosestEnemy()
         for i = 1, #children do
             local object = children[i]
             
-            if object.Name == "PropHitboxPlaceholder" and not jefeVivo then
+            -- Ignoramos las hitboxes falsas sin importar quién esté vivo
+            if object.Name == "PropHitboxPlaceholder" then
                 continue 
             end
 
@@ -249,7 +241,6 @@ local function GetClosestEnemy()
                 
                 if humanoid and humanoid.Health > 0 and root and object.Parent then
                     local distance = (root.Position - myPos).Magnitude
-                    if object.Name == "Gas Knight" then distance = distance - 1000 end 
                     
                     if object ~= lastTarget then table.insert(primaryCandidates, {model = object, dist = distance})
                     else table.insert(backupCandidates, {model = object, dist = distance}) end
