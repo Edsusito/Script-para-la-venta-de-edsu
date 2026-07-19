@@ -6,8 +6,8 @@ local UsuariosPermitidos = {
     [7255753286] = true,  -- TW_Calamity
     [2014903362] = true,  -- Edsusito (Creador)
     [8117327541] = true,  -- MC_AleX
-    [4121727989] = true,   -- SAMZzz
-    [8019265589] = true,   -- azeus
+    [4121727989] = true,  -- SAMZzz
+    [8019265589] = true,  -- Nuevo Usuario
     [000000000] = true,   -- Espacio 6
     [000000000] = true,   -- Espacio 7
     [000000000] = true,   -- Espacio 8
@@ -27,12 +27,14 @@ local UsuariosPermitidos = {
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local localPlayer = Players.LocalPlayer
 
 -- ◈ Candado de Seguridad
+local targetGui = pcall(function() return CoreGui end) and CoreGui or localPlayer:WaitForChild("PlayerGui")
+
 if not UsuariosPermitidos[localPlayer.UserId] then
-    local targetGui = pcall(function() return CoreGui end) and CoreGui or localPlayer:WaitForChild("PlayerGui")
-    
     local TrollScreen = Instance.new("ScreenGui")
     TrollScreen.Name = "EdsusitoSecurity"
     TrollScreen.IgnoreGuiInset = true
@@ -66,13 +68,16 @@ end
 
 print("◈ Bienvenido, " .. localPlayer.DisplayName .. ". Edsusito Premium cargado correctamente. ◈")
 
+-- Limpiar UI anterior si se re-ejecuta
+local oldUi = targetGui:FindFirstChild("EdsusitoPremiumUI")
+if oldUi then oldUi:Destroy() end
+
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 -- ⚙️ SERVICIOS Y VARIABLES DEL SISTEMA
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 local HttpService = game:GetService("HttpService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
@@ -81,6 +86,8 @@ local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local justDied = false 
 local attackHeight = 40 -- Altura inicial ajustada
 local selectedWeapon = "Sword" 
+local weaponOptions = {"Sword", "Melee", "Blox Fruit"}
+local currentWeaponIndex = 1
 
 local autoDungeonActive = false
 local autoV4Active = false
@@ -208,7 +215,7 @@ local function StartAutoBuffs()
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 👁️ DETECCIÓN DE ENEMIGOS (FIX STAGE 15)
+-- 👁️ DETECCIÓN DE ENEMIGOS
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 local function GetClosestEnemy()
     if justDied then return nil end 
@@ -230,7 +237,6 @@ local function GetClosestEnemy()
         for i = 1, #children do
             local object = children[i]
             
-            -- Ignoramos las hitboxes falsas sin importar quién esté vivo
             if object.Name == "PropHitboxPlaceholder" then
                 continue 
             end
@@ -367,12 +373,10 @@ local function RotateTargets()
             local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
             local timer = 0
             
-            -- Cambio de NPC cada 0.3 segundos con Fast Attack Activo
             while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.3 and not justDied do
                 TeleportToEnemy(currentTarget)
                 AttackEnemy(currentTarget)
-                
-                task.wait() -- Disparo rápido sin delay forzado
+                task.wait() 
                 timer = timer + 0.01
             end
         else
@@ -399,74 +403,239 @@ local function RotateTargets()
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 🎨 INTERFAZ GRÁFICA (RAYFIELD)
+-- 🎨 INTERFAZ GRÁFICA PROPIA (Reemplazo de Rayfield)
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local UI = Instance.new("ScreenGui")
+UI.Name = "EdsusitoPremiumUI"
+UI.ResetOnSpawn = false
+UI.Parent = targetGui
 
-local Window = Rayfield:CreateWindow({
-    Name = "👑 Edsusito Premium | The Masterpiece",
-    LoadingTitle = "Cargando código de autor...",
-    LoadingSubtitle = "By Edsu",
-    ConfigurationSaving = { Enabled = false },
-    Discord = { Enabled = false },
-    KeySystem = false
-})
+-- Colores del Tema
+local bgDark = Color3.fromRGB(20, 20, 20)
+local bgLight = Color3.fromRGB(35, 35, 35)
+local accentColor = Color3.fromRGB(255, 170, 0) -- Naranja VIP
+local redOff = Color3.fromRGB(200, 50, 50)
+local greenOn = Color3.fromRGB(50, 200, 50)
+local textWhite = Color3.fromRGB(240, 240, 240)
 
-local DungeonTab = Window:CreateTab("Control Dungeon", 4483362458)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 300, 0, 260)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -130)
+MainFrame.BackgroundColor3 = bgDark
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Parent = UI
 
-DungeonTab:CreateSection("◈ Inicio Rápido")
-DungeonTab:CreateToggle({
-    Name = "⚡ Iniciar Auto Dungeon",
-    CurrentValue = false,
-    Flag = "EdsuAutoDungeonFlag",
-    Callback = function(Value)
-        autoDungeonActive = Value
-        if Value then
-            justDied = false
-            StartAutoBuffs() 
-            coroutine.wrap(RotateTargets)()
-            Rayfield:Notify({Title = "Sistema Activo", Content = "Limpieza de sala iniciada.", Duration = 3})
-        else
-            currentTarget = nil
-            lastTarget = nil
-            justDied = false
-        end
-    end,
-})
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
 
-DungeonTab:CreateSection("◈ Armamento y Distancia")
-DungeonTab:CreateDropdown({
-    Name = "⚔️ Arma Seleccionada",
-    Options = {"Sword", "Melee", "Blox Fruit"},
-    CurrentOption = {"Sword"},
-    MultipleOptions = false,
-    Flag = "WeaponDropdown",
-    Callback = function(Option)
-        selectedWeapon = Option[1]
-    end,
-})
+-- Barra de Título y Arrastre
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = bgLight
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
 
-DungeonTab:CreateSlider({
-    Name = "🚁 Altura de Ataque",
-    Range = {10, 100}, 
-    Increment = 1,
-    Suffix = " studs",
-    CurrentValue = 40, -- 40 por defecto
-    Flag = "AttackHeightFlag",
-    Callback = function(Value)
-        attackHeight = Value
-    end,
-})
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = TitleBar
 
-DungeonTab:CreateSection("◈ Funciones Adicionales")
-DungeonTab:CreateToggle({
-    Name = "🔥 Auto Activar V4",
-    CurrentValue = false,
-    Flag = "AutoV4Flag",
-    Callback = function(Value)
-        autoV4Active = Value
-        if Value then
-            Rayfield:Notify({Title = "V4 Activo", Content = "Spam de habilidad iniciado.", Duration = 3})
-        end
-    end,
-})
+-- Fix esquinas de abajo de la barra de título
+local TitleFix = Instance.new("Frame")
+TitleFix.Size = UDim2.new(1, 0, 0, 10)
+TitleFix.Position = UDim2.new(0, 0, 1, -10)
+TitleFix.BackgroundColor3 = bgLight
+TitleFix.BorderSizePixel = 0
+TitleFix.Parent = TitleBar
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -50, 1, 0)
+TitleText.Position = UDim2.new(0, 15, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "👑 Edsusito Premium"
+TitleText.TextColor3 = accentColor
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Font = Enum.Font.GothamBold
+TitleText.TextSize = 16
+TitleText.Parent = TitleBar
+
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 40, 1, 0)
+MinimizeBtn.Position = UDim2.new(1, -40, 0, 0)
+MinimizeBtn.BackgroundTransparency = 1
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = textWhite
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 20
+MinimizeBtn.Parent = TitleBar
+
+-- Contenedor de Opciones
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, 0, 1, -40)
+Content.Position = UDim2.new(0, 0, 0, 40)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 10)
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Parent = Content
+
+local Padding = Instance.new("UIPadding")
+Padding.PaddingTop = UDim.new(0, 15)
+Padding.Parent = Content
+
+-- Función creadora de botones
+local function CreateButton(text, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = textWhite
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 14
+    btn.AutoButtonColor = false
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+    
+    btn.Parent = Content
+    return btn
+end
+
+-- Botón 1: Auto Dungeon
+local btnAutoDungeon = CreateButton("⚡ Iniciar Auto Dungeon: OFF", redOff)
+btnAutoDungeon.MouseButton1Click:Connect(function()
+    autoDungeonActive = not autoDungeonActive
+    if autoDungeonActive then
+        btnAutoDungeon.Text = "⚡ Iniciar Auto Dungeon: ON"
+        btnAutoDungeon.BackgroundColor3 = greenOn
+        justDied = false
+        StartAutoBuffs() 
+        coroutine.wrap(RotateTargets)()
+    else
+        btnAutoDungeon.Text = "⚡ Iniciar Auto Dungeon: OFF"
+        btnAutoDungeon.BackgroundColor3 = redOff
+        currentTarget = nil
+        lastTarget = nil
+        justDied = false
+    end
+end)
+
+-- Botón 2: Arma Seleccionada (Cíclico)
+local btnWeapon = CreateButton("⚔️ Arma: " .. weaponOptions[currentWeaponIndex], bgLight)
+btnWeapon.MouseButton1Click:Connect(function()
+    currentWeaponIndex = currentWeaponIndex + 1
+    if currentWeaponIndex > #weaponOptions then currentWeaponIndex = 1 end
+    selectedWeapon = weaponOptions[currentWeaponIndex]
+    btnWeapon.Text = "⚔️ Arma: " .. selectedWeapon
+end)
+
+-- Sección 3: Altura de Ataque (Botones + y -)
+local HeightFrame = Instance.new("Frame")
+HeightFrame.Size = UDim2.new(0.9, 0, 0, 35)
+HeightFrame.BackgroundTransparency = 1
+HeightFrame.Parent = Content
+
+local btnMinus = Instance.new("TextButton")
+btnMinus.Size = UDim2.new(0, 35, 1, 0)
+btnMinus.BackgroundColor3 = bgLight
+btnMinus.Text = "-"
+btnMinus.TextColor3 = textWhite
+btnMinus.Font = Enum.Font.GothamBold
+btnMinus.TextSize = 18
+btnMinus.Parent = HeightFrame
+Instance.new("UICorner", btnMinus).CornerRadius = UDim.new(0, 6)
+
+local HeightDisplay = Instance.new("TextLabel")
+HeightDisplay.Size = UDim2.new(1, -80, 1, 0)
+HeightDisplay.Position = UDim2.new(0, 40, 0, 0)
+HeightDisplay.BackgroundColor3 = bgLight
+HeightDisplay.Text = "🚁 Altura: " .. attackHeight
+HeightDisplay.TextColor3 = textWhite
+HeightDisplay.Font = Enum.Font.GothamSemibold
+HeightDisplay.TextSize = 14
+HeightDisplay.Parent = HeightFrame
+Instance.new("UICorner", HeightDisplay).CornerRadius = UDim.new(0, 6)
+
+local btnPlus = Instance.new("TextButton")
+btnPlus.Size = UDim2.new(0, 35, 1, 0)
+btnPlus.Position = UDim2.new(1, -35, 0, 0)
+btnPlus.BackgroundColor3 = bgLight
+btnPlus.Text = "+"
+btnPlus.TextColor3 = textWhite
+btnPlus.Font = Enum.Font.GothamBold
+btnPlus.TextSize = 18
+btnPlus.Parent = HeightFrame
+Instance.new("UICorner", btnPlus).CornerRadius = UDim.new(0, 6)
+
+btnMinus.MouseButton1Click:Connect(function()
+    if attackHeight > 10 then attackHeight = attackHeight - 5 end
+    HeightDisplay.Text = "🚁 Altura: " .. attackHeight
+end)
+
+btnPlus.MouseButton1Click:Connect(function()
+    if attackHeight < 100 then attackHeight = attackHeight + 5 end
+    HeightDisplay.Text = "🚁 Altura: " .. attackHeight
+end)
+
+-- Botón 4: Auto V4
+local btnAutoV4 = CreateButton("🔥 Auto Activar V4: OFF", redOff)
+btnAutoV4.MouseButton1Click:Connect(function()
+    autoV4Active = not autoV4Active
+    if autoV4Active then
+        btnAutoV4.Text = "🔥 Auto Activar V4: ON"
+        btnAutoV4.BackgroundColor3 = greenOn
+    else
+        btnAutoV4.Text = "🔥 Auto Activar V4: OFF"
+        btnAutoV4.BackgroundColor3 = redOff
+    end
+end)
+
+-- ◈ Lógica de Minimizar
+local isMinimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    Content.Visible = not isMinimized
+    MinimizeBtn.Text = isMinimized and "+" or "-"
+    MainFrame.Size = isMinimized and UDim2.new(0, 300, 0, 40) or UDim2.new(0, 300, 0, 260)
+end)
+
+-- ◈ Lógica de Arrastre (Dragging)
+local dragging
+local dragInput
+local dragStart
+local startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+TitleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
