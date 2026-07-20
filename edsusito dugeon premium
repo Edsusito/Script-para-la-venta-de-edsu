@@ -3,7 +3,7 @@
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 local UsuariosPermitidos = {
-    [7255753286] = true,  -- TW_Calamity
+    [725575328] = true,  -- TW_Calamity
     [2014903362] = true,  -- Edsusito (Creador)
     [8117327541] = true,  -- MC_AleX
     [4121727989] = true,  -- SAMZzz
