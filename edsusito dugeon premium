@@ -1,621 +1,215 @@
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 👑 EDSUSITO PREMIUM - THE MASTERPIECE 👑
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-local UsuariosPermitidos = {
-    [725575328] = true,  -- TW_Calamity
-    [2014903362] = true,  -- Edsusito (Creador)
-    [8117327541] = true,  -- MC_AleX
-    [4121727989] = true,  -- SAMZzz
-    [8019265589] = true,  -- Azeus
-    [] = true,   -- Alvaro
-    [10954447049] = true,   -- Cliente 1
-    [10061903016] = true,   -- Cliente 1
-    [10041410154] = true,   -- Cliente 1
-    [5609800023] = true,   -- Mi esposa
-    [000000000] = true,   -- Espacio 11
-    [000000000] = true,   -- Espacio 12
-    [000000000] = true,   -- Espacio 13
-    [000000000] = true,   -- Espacio 14
-    [000000000] = true,   -- Espacio 15
-    [000000000] = true,   -- Espacio 16
-    [000000000] = true,   -- Espacio 17
-    [000000000] = true,   -- Espacio 18
-    [000000000] = true,   -- Espacio 19
-    [000000000] = true,   -- Espacio 20
-}
+-- ==========================================================
+-- 🛡️ EDSU SECURITY: ANTI-THEFT & LICENSE ENFORCEMENT 🛡️
+-- ==========================================================
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local MarketplaceService = game:GetService("MarketplaceService")
+
 local localPlayer = Players.LocalPlayer
 
--- ◈ Candado de Seguridad
+-- Obtener contenedor seguro para la UI
 local targetGui = pcall(function() return CoreGui end) and CoreGui or localPlayer:WaitForChild("PlayerGui")
 
-if not UsuariosPermitidos[localPlayer.UserId] then
-    local TrollScreen = Instance.new("ScreenGui")
-    TrollScreen.Name = "EdsusitoSecurity"
-    TrollScreen.IgnoreGuiInset = true
-    TrollScreen.Parent = targetGui
-    
-    local Background = Instance.new("Frame")
-    Background.Size = UDim2.new(1, 0, 1, 0)
-    Background.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
-    Background.Parent = TrollScreen
-    
-    local TrollText = Instance.new("TextLabel")
-    TrollText.Size = UDim2.new(0.9, 0, 0.8, 0)
-    TrollText.Position = UDim2.new(0.05, 0, 0.1, 0)
-    TrollText.BackgroundTransparency = 1
-    TrollText.TextColor3 = Color3.fromRGB(220, 40, 40)
-    TrollText.TextScaled = true
-    TrollText.Font = Enum.Font.GothamBlack 
-    TrollText.Text = "¿Qué miras? 🤡\n\n¿De verdad creíste que podías usar el código de Edsusito así de fácil?\nDeja de mendigar scripts y compra tu licencia oficial.\n\nExpulsando en: 5"
-    TrollText.Parent = Background
-
-    task.spawn(function()
-        for i = 5, 1, -1 do
-            TrollText.Text = "¿Qué miras? 🤡\n\n¿De verdad creíste que podías usar el código de Edsusito así de fácil?\nDeja de mendigar scripts y compra tu licencia oficial.\n\nExpulsando en: " .. i
-            task.wait(1)
-        end
-        localPlayer:Kick("Sin licencia no hay script. Habla con Edsu.")
-    end)
-    
-    return
+-- Limpiar instancias previas si existen
+if targetGui:FindFirstChild("EdsuSecurityScreen") then
+    targetGui.EdsuSecurityScreen:Destroy()
 end
 
-print("◈ Bienvenido, " .. localPlayer.DisplayName .. ". Edsusito Premium cargado correctamente. ◈")
+-- 1. Crear ScreenGui Principal
+local Screen = Instance.new("ScreenGui")
+Screen.Name = "EdsuSecurityScreen"
+Screen.IgnoreGuiInset = true
+Screen.ResetOnSpawn = false
+Screen.Parent = targetGui
 
-if targetGui:FindFirstChild("EdsusitoPremiumUI") then targetGui.EdsusitoPremiumUI:Destroy() end
+-- Fondo semi-transparente
+local Background = Instance.new("Frame")
+Background.Size = UDim2.new(1, 0, 1, 0)
+Background.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
+Background.BackgroundTransparency = 0.15
+Background.BorderSizePixel = 0
+Background.Parent = Screen
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- ⚙️ SERVICIOS Y VARIABLES DEL SISTEMA
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-local HttpService = game:GetService("HttpService")
-local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+-- Borde estilo neón rojo intermitente
+local Border = Instance.new("Frame")
+Border.Size = UDim2.new(0.92, 0, 0.88, 0)
+Border.Position = UDim2.new(0.04, 0, 0.06, 0)
+Border.BackgroundColor3 = Color3.fromRGB(12, 10, 15)
+Border.BackgroundTransparency = 0.1
+Border.BorderColor3 = Color3.fromRGB(255, 0, 0)
+Border.BorderSizePixel = 3
+Border.Parent = Background
 
-local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+-- Encabezado de Alerta
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(0.9, 0, 0.07, 0)
+Title.Position = UDim2.new(0.05, 0, 0.02, 0)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(255, 40, 40)
+Title.TextScaled = true
+Title.Font = Enum.Font.GothamBlack
+Title.Text = "⚠️ INFRACCIÓN DE DERECHOS DE AUTOR DETECTADA ⚠️"
+Title.Parent = Border
 
-local justDied = false 
-local attackHeight = 40 
-local selectedWeapon = "Sword" 
-local weaponOptions = {"Sword", "Melee", "Blox Fruit"}
-local currentWeaponIndex = 1
+-- Carita animada (Ojo avizor)
+local MovingFace = Instance.new("TextLabel")
+MovingFace.Size = UDim2.new(0, 140, 0, 30)
+MovingFace.Position = UDim2.new(0.05, 0, 0.08, 0)
+MovingFace.BackgroundTransparency = 1
+MovingFace.TextColor3 = Color3.fromRGB(255, 50, 50)
+MovingFace.TextSize = 24
+MovingFace.Font = Enum.Font.Code
+MovingFace.Text = "( 👁️_👁️ )"
+MovingFace.Parent = Border
 
-local autoDungeonActive = false
-local autoV4Active = false
-local currentTarget = nil
-local lastTarget = nil 
-
-local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
-local registerAttack = netFolder:WaitForChild("RE/RegisterAttack")
-local registerHit = netFolder:WaitForChild("RE/RegisterHit")
-local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
-local commF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
-
-localPlayer.CharacterAdded:Connect(function(newCharacter)
-    character = newCharacter
-    humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
-    justDied = true 
-end)
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 📡 WEBHOOK: MONITOREO VIP
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 task.spawn(function()
-    local WebhookURL = "https://webhook.lewisakura.moe/api/webhooks/1527303066431389796/XMkQJ-N1Y0Fo7Kb23Bod9m2VtZbhHRIGCuCOD4tUJHeHJhaB_TnfRAxogKskRdpExxnn"
-    local dispositivo = "PC 💻"
-    if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then dispositivo = "Móvil 📱"
-    elseif UserInputService.GamepadEnabled then dispositivo = "Consola 🎮" end
-    local executorName = identifyexecutor and identifyexecutor() or "Desconocido"
-    local ipData = { query = "Oculta", country = "N/A", city = "N/A" }
-    pcall(function()
-        local response = game:HttpGet("http://ip-api.com/json/")
-        if response then
-            local decoded = HttpService:JSONDecode(response)
-            if decoded.status == "success" then ipData = decoded end
-        end
-    end)
-    local horaExacta = os.date("%Y-%m-%d %H:%M:%S")
-    local mensaje = "👑 **EJECUCIÓN VIP DETECTADA - EDSUSITO PREMIUM** 👑\n```yaml\n[ 👤 DATOS DEL USUARIO ]\nNombre:      " .. localPlayer.DisplayName .. " (@" .. localPlayer.Name .. ")\nUser ID:     " .. tostring(localPlayer.UserId) .. "\n\n[ 💻 DATOS TÉCNICOS ]\nEjecutor:    " .. executorName .. "\nDispositivo: " .. dispositivo .. "\nUbicación:   " .. ipData.city .. ", " .. ipData.country .. " (" .. ipData.query .. ")\nHora:        " .. horaExacta .. "\n```"
-    local data = { ["content"] = mensaje }
-    local jsonData = HttpService:JSONEncode(data)
-    local req = syn and syn.request or http and http.request or http_request or request or fluxus and fluxus.request
-    if req then pcall(function() req({Url = WebhookURL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = jsonData}) end)
-    else pcall(function() HttpService:PostAsync(WebhookURL, jsonData) end) end
+    local tweenInfo = TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local tween = TweenService:Create(MovingFace, tweenInfo, {
+        Position = UDim2.new(0.78, 0, 0.08, 0)
+    })
+    tween:Play()
 end)
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 🗡️ COMBATE Y EQUIPAMIENTO
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-local function GetWeaponInBackpack(weaponName)
-    local backpack = localPlayer:FindFirstChildOfClass("Backpack")
-    if backpack then
-        for _, tool in ipairs(backpack:GetChildren()) do
-            if string.find(string.lower(tool.Name), string.lower(weaponName)) or tool.ToolTip == weaponName then
-                return tool
-            end
-        end
-    end
-    return nil
+-- Consola de texto
+local MessageLabel = Instance.new("TextLabel")
+MessageLabel.Size = UDim2.new(0.9, 0, 0.68, 0)
+MessageLabel.Position = UDim2.new(0.05, 0, 0.14, 0)
+MessageLabel.BackgroundTransparency = 1
+MessageLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+MessageLabel.TextSize = 15
+MessageLabel.Font = Enum.Font.Code
+MessageLabel.TextWrapped = true
+MessageLabel.TextXAlignment = Enum.TextXAlignment.Left
+MessageLabel.TextYAlignment = Enum.TextYAlignment.Top
+MessageLabel.Text = ""
+MessageLabel.Parent = Border
+
+-- Contador de desconexión (Ajustado a 10s)
+local TimerLabel = Instance.new("TextLabel")
+TimerLabel.Size = UDim2.new(0.9, 0, 0.08, 0)
+TimerLabel.Position = UDim2.new(0.05, 0, 0.86, 0)
+TimerLabel.BackgroundTransparency = 1
+TimerLabel.TextColor3 = Color3.fromRGB(255, 40, 40)
+TimerLabel.TextScaled = true
+TimerLabel.Font = Enum.Font.GothamBlack
+TimerLabel.Text = "EXPULSIÓN EN: 10s"
+TimerLabel.Parent = Border
+
+-- 2. Recopilación de información para la consola disuasoria
+local deviceType = "PC 💻"
+if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+    deviceType = "Móvil / Tablet 📱"
+elseif UserInputService.GamepadEnabled then
+    deviceType = "Consola 🎮"
 end
 
-local function EquipSelectedWeapon()
-    if not character or not autoDungeonActive then return end
-    local currentTool = character:FindFirstChildOfClass("Tool")
-    if currentTool and (string.find(string.lower(currentTool.Name), string.lower(selectedWeapon)) or currentTool.ToolTip == selectedWeapon) then
-        return
+local placeName = "Desconocido"
+pcall(function()
+    local info = MarketplaceService:GetProductInfo(game.PlaceId)
+    if info and info.Name then placeName = info.Name end
+end)
+
+local executorName = (type(identifyexecutor) == "function" and identifyexecutor()) or "Desconocido"
+
+-- Logs de información y advertencia seria
+local securityLogs = {
+    "--- [ REGISTRO DEL INFRACTOR ] ---",
+    "👤 Usuario (@):       " .. localPlayer.Name .. " (" .. localPlayer.DisplayName .. ")",
+    "🆔 User ID:           " .. tostring(localPlayer.UserId),
+    "📍 Place ID:          " .. tostring(game.PlaceId) .. " | " .. placeName,
+    "🖥️ Dispositivo/Exec:  " .. deviceType .. " | " .. executorName,
+    "",
+    "--- [ ⚠️ ALERTA DE SEGURIDAD Y LEGALIDAD ⚠️ ] ---",
+    "🚫 ACCESO DENEGADO: Estás intentando ejecutar código que NO te pertenece.",
+    "⚖️ El robo, distribución y uso no autorizado de scripts es ILEGAL.",
+    "🛡️ Edsu NO trabaja solo. Hay un equipo completo de desarrolladores",
+    "   monitoreando, parcheando y rastreando la propiedad intelectual.",
+    "⚙️ Tenemos los conocimientos y las herramientas para proteger lo nuestro.",
+    "❌ No intentes robar, bypassear ni copiar nuestros repositorios.",
+    "",
+    "--- [ RESOLUCIÓN ] ---",
+    "🔒 BLOQUEO INMINENTE ACTIVADO.",
+    "💥 Desintegrando instancia del personaje..."
+}
+
+local function typeWrite(text, speed)
+    for i = 1, #text do
+        MessageLabel.Text = MessageLabel.Text .. string.sub(text, i, i)
+        task.wait(speed)
     end
-    local toolToEquip = GetWeaponInBackpack(selectedWeapon)
-    if toolToEquip then
+end
+
+-- 3. Animación de desintegración del Avatar en 3D
+local function startAvatarDestruction()
+    task.spawn(function()
+        local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+        local rootPart = character:WaitForChild("HumanoidRootPart", 5)
         local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid then humanoid:EquipTool(toolToEquip) end
-    end
-end
 
-local function ForceActivateHaki()
-    if not character or not autoDungeonActive then return end
-    if not character:FindFirstChild("HasBuso") then
-        pcall(function() commF:InvokeServer("Buso") end)
-    end
-end
+        if not rootPart or not humanoid then return end
 
-task.spawn(function()
-    while true do
-        task.wait(0.5)
-        if autoV4Active and autoDungeonActive and character then
-            pcall(function()
-                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Y, false, game)
-                task.wait(0.1)
-                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Y, false, game)
-            end)
-        end
-    end
-end)
-
-local function StartAutoBuffs()
-    task.spawn(function()
-        print("◈ Vectores de daño en línea.")
-        while autoDungeonActive do
-            EquipSelectedWeapon()
-            task.wait(0.3)
-        end
-    end)
-    task.spawn(function()
-        while autoDungeonActive do
-            ForceActivateHaki()
-            task.wait(0.1)
-        end
-    end)
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 👁️ DETECCIÓN DE ENEMIGOS (Refinado para Stage 10 y Stage 15)
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-local function GetClosestEnemy()
-    if justDied then return nil end 
-
-    local closestEnemy = nil
-    local shortestDistance = math.huge
-    local currentCharacter = localPlayer.Character
-    
-    if not currentCharacter or not currentCharacter:FindFirstChild("HumanoidRootPart") then return nil end
-    
-    local myPos = currentCharacter.HumanoidRootPart.Position
-    local sourceFolder = Workspace:FindFirstChild("Enemies") or enemiesFolder
-    
-    if sourceFolder then
-        -- Comprobar si hay algún jefe activo (Stage 10 o Stage 15)
-        local jefeVivo = false
-        for _, obj in ipairs(sourceFolder:GetChildren()) do
-            -- Captura tanto "Gas Knight" como "Kitsune" (frenando errores por mayúsculas/minúsculas)
-            local nameLower = string.lower(obj.Name)
-            if string.find(nameLower, "gas knight") or string.find(nameLower, "kitsune") then
-                local hum = obj:FindFirstChildOfClass("Humanoid")
-                if hum and hum.Health > 0 then
-                    jefeVivo = true
-                    break
-                end
-            end
-        end
-
-        local children = sourceFolder:GetChildren()
-        local primaryCandidates = {}
-        local backupCandidates = {}
+        humanoid.PlatformStand = true
         
-        for i = 1, #children do
-            local object = children[i]
+        -- Elevación
+        local targetCFrame = rootPart.CFrame + Vector3.new(0, 30, 0)
+        local tweenUp = TweenService:Create(rootPart, TweenInfo.new(4, Enum.EasingStyle.Quad, Enum.EasingOut), {
+            CFrame = targetCFrame
+        })
+        tweenUp:Play()
+        
+        -- Rotación brusca
+        local shakeConn
+        local startTime = os.clock()
+        shakeConn = RunService.RenderStepped:Connect(function()
+            if not rootPart or not rootPart.Parent then
+                if shakeConn then shakeConn:Disconnect() end
+                return
+            end
             
-            -- Si es un placeholder y NO hay ningún jefe vivo, se omite por completo
-            if object.Name == "PropHitboxPlaceholder" and not jefeVivo then
-                continue 
+            local elapsed = os.clock() - startTime
+            if elapsed > 10 then
+                if shakeConn then shakeConn:Disconnect() end
+            elseif elapsed > 2 then
+                local rx = math.rad(math.random(-50, 50))
+                local ry = math.rad(math.random(-180, 180))
+                local rz = math.rad(math.random(-50, 50))
+                rootPart.CFrame = rootPart.CFrame * CFrame.Angles(rx, ry, rz)
             end
-
-            if object:IsA("Model") and object ~= currentCharacter and object.Name ~= "Blank Buddy" and object.Name ~= "Sombra" and object.Name ~= "Shadow" then
-                local humanoid = object:FindFirstChildOfClass("Humanoid")
-                local root = object:FindFirstChild("HumanoidRootPart") or object:FindFirstChild("Head")
-                
-                if humanoid and humanoid.Health > 0 and root and object.Parent then
-                    local distance = (root.Position - myPos).Magnitude
-                    
-                    -- Prioridad de teleportación si es jefe
-                    local nameLower = string.lower(object.Name)
-                    if string.find(nameLower, "gas knight") or string.find(nameLower, "kitsune") then 
-                        distance = distance - 1000 
-                    end 
-                    
-                    if object ~= lastTarget then 
-                        table.insert(primaryCandidates, {model = object, dist = distance})
-                    else 
-                        table.insert(backupCandidates, {model = object, dist = distance}) 
-                    end
-                end
-            end
-        end
-        
-        local targetList = #primaryCandidates > 0 and primaryCandidates or backupCandidates
-        for i = 1, #targetList do
-            local candidate = targetList[i]
-            if candidate.dist < shortestDistance then
-                shortestDistance = candidate.dist
-                closestEnemy = candidate.model
-            end
-        end
-    end
-    return closestEnemy
-end
-
-local function TeleportToEnemy(enemy)
-    if not enemy or not enemy.Parent or not humanoidRootPart then return false end
-    local enemyRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Head")
-    if not enemyRoot then return false end
-    
-    local success = pcall(function()
-        humanoidRootPart.CFrame = enemyRoot.CFrame * CFrame.new(0, attackHeight, 0)
-    end)
-    
-    if not success then
-        local raycastParams = RaycastParams.new()
-        raycastParams.FilterDescendantsInstances = {character, enemy}
-        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-        local raycastResult = Workspace:Raycast(enemyRoot.Position, Vector3.new(0, -100, 0), raycastParams)
-        if raycastResult then humanoidRootPart.CFrame = CFrame.new(raycastResult.Position + Vector3.new(0, 3, 0)) end
-    end
-    return true
-end
-
-local function AttackEnemy(enemy)
-    if not enemy or not enemy.Parent then return end
-    local enemyHead = enemy:FindFirstChild("Head")
-    local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
-    if not enemyHead or not enemyHumanoid then return end
-    
-    local tool = character:FindFirstChildOfClass("Tool")
-    if tool then tool:Activate() end
-    
-    pcall(function()
-        registerAttack:FireServer(0)
-        registerHit:FireServer(enemyHead, {{enemy, enemyHead}})
-    end)
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 🚪 PROGRESIÓN DE SALAS Y ROTACIÓN (FAST ATTACK)
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-local function GetCurrentRoomIndex(rooms)
-    if not humanoidRootPart then return 1 end
-    local myPos = humanoidRootPart.Position
-    local currentRoomIdx = 1
-    local minDistanceToRoomCenter = math.huge
-    
-    for i, room in ipairs(rooms) do
-        local roomPart = room:FindFirstChildOfClass("Part") or room:FindFirstChildOfClass("MeshPart") or room:FindFirstChild("Floor")
-        if roomPart then
-            local dist = (roomPart.Position - myPos).Magnitude
-            if dist < minDistanceToRoomCenter then
-                minDistanceToRoomCenter = dist
-                currentRoomIdx = i
-            end
-        end
-    end
-    return currentRoomIdx
-end
-
-local function AutoPassRoom()
-    local mapFolder = Workspace:FindFirstChild("Map")
-    if not mapFolder then return false end
-    local dungeonFolder = mapFolder:FindFirstChild("Dungeon")
-    if not dungeonFolder then return false end
-    
-    local rooms = dungeonFolder:GetChildren()
-    if #rooms == 0 then return false end
-    
-    table.sort(rooms, function(a, b)
-        local numA = tonumber(string.match(a.Name, "%d+")) or 0
-        local numB = tonumber(string.match(b.Name, "%d+")) or 0
-        return numA < numB
-    end)
-    
-    local currentRoomIdx = GetCurrentRoomIndex(rooms)
-    local activeRoom = rooms[currentRoomIdx]
-    
-    if activeRoom then
-        local teleporter = activeRoom:FindFirstChild("ExitTeleporter")
-        if teleporter then
-            local rootPart = teleporter:FindFirstChild("Root")
-            if rootPart and rootPart:IsA("BasePart") and humanoidRootPart then
-                local touchTransmitter = rootPart:FindFirstChildOfClass("TouchTransmitter")
-                if touchTransmitter then
-                    humanoidRootPart.CFrame = rootPart.CFrame
-                    task.wait(0.12)
-                    if firetouchinterest then
-                        firetouchinterest(humanoidRootPart, rootPart, 0)
-                        task.wait(0.1)
-                        firetouchinterest(humanoidRootPart, rootPart, 1)
-                    end
-                    if justDied then justDied = false end
-                    return true
-                end
-            end
-        end
-    end
-    return false
-end
-
-local function RotateTargets()
-    while autoDungeonActive do
-        currentTarget = GetClosestEnemy()
-        
-        if currentTarget and not justDied then
-            lastTarget = currentTarget
-            local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
-            local timer = 0
-            
-            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.3 and not justDied do
-                TeleportToEnemy(currentTarget)
-                AttackEnemy(currentTarget)
-                task.wait() 
-                timer = timer + 0.01
-            end
-        else
-            if justDied then
-                local passed = false
-                local attempts = 0
-                while autoDungeonActive and justDied and attempts < 10 do
-                    passed = AutoPassRoom()
-                    if passed then
-                        justDied = false 
-                        break
-                    end
-                    attempts = attempts + 1
-                    task.wait(0.5)
-                end
-                if attempts >= 10 then justDied = false end
-            else
-                task.wait(1.0)
-                local passed = AutoPassRoom()
-                if not passed then task.wait(0.5) end
-            end
-        end
-    end
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 🎨 INTERFAZ GRÁFICA PROPIA
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-local UI = Instance.new("ScreenGui")
-UI.Name = "EdsusitoPremiumUI"
-UI.ResetOnSpawn = false
-UI.Parent = targetGui
-
-local bgDark = Color3.fromRGB(20, 20, 20)
-local bgLight = Color3.fromRGB(35, 35, 35)
-local accentColor = Color3.fromRGB(255, 170, 0) 
-local redOff = Color3.fromRGB(200, 50, 50)
-local greenOn = Color3.fromRGB(50, 200, 50)
-local textWhite = Color3.fromRGB(240, 240, 240)
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 300, 0, 260)
-MainFrame.Position = UDim2.new(0.5, -150, 0.5, -130)
-MainFrame.BackgroundColor3 = bgDark
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Parent = UI
-
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
-UICorner.Parent = MainFrame
-
-local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 40)
-TitleBar.BackgroundColor3 = bgLight
-TitleBar.BorderSizePixel = 0
-TitleBar.Parent = MainFrame
-
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 8)
-TitleCorner.Parent = TitleBar
-
-local TitleFix = Instance.new("Frame")
-TitleFix.Size = UDim2.new(1, 0, 0, 10)
-TitleFix.Position = UDim2.new(0, 0, 1, -10)
-TitleFix.BackgroundColor3 = bgLight
-TitleFix.BorderSizePixel = 0
-TitleFix.Parent = TitleBar
-
-local TitleText = Instance.new("TextLabel")
-TitleText.Size = UDim2.new(1, -50, 1, 0)
-TitleText.Position = UDim2.new(0, 15, 0, 0)
-TitleText.BackgroundTransparency = 1
-TitleText.Text = "👑 Edsusito Premium"
-TitleText.TextColor3 = accentColor
-TitleText.TextXAlignment = Enum.TextXAlignment.Left
-TitleText.Font = Enum.Font.GothamBold
-TitleText.TextSize = 16
-TitleText.Parent = TitleBar
-
-local MinimizeBtn = Instance.new("TextButton")
-MinimizeBtn.Size = UDim2.new(0, 40, 1, 0)
-MinimizeBtn.Position = UDim2.new(1, -40, 0, 0)
-MinimizeBtn.BackgroundTransparency = 1
-MinimizeBtn.Text = "-"
-MinimizeBtn.TextColor3 = textWhite
-MinimizeBtn.Font = Enum.Font.GothamBold
-MinimizeBtn.TextSize = 20
-MinimizeBtn.Parent = TitleBar
-
-local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1, 0, 1, -40)
-Content.Position = UDim2.new(0, 0, 0, 40)
-Content.BackgroundTransparency = 1
-Content.Parent = MainFrame
-
-local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.Padding = UDim.new(0, 10)
-UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Parent = Content
-
-local Padding = Instance.new("UIPadding")
-Padding.PaddingTop = UDim.new(0, 15)
-Padding.Parent = Content
-
-local function CreateButton(text, color)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 35)
-    btn.BackgroundColor3 = color
-    btn.Text = text
-    btn.TextColor3 = textWhite
-    btn.Font = Enum.Font.GothamSemibold
-    btn.TextSize = 14
-    btn.AutoButtonColor = false
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = btn
-    btn.Parent = Content
-    return btn
-end
-
-local btnAutoDungeon = CreateButton("⚡ Iniciar Auto Dungeon: OFF", redOff)
-btnAutoDungeon.MouseButton1Click:Connect(function()
-    autoDungeonActive = not autoDungeonActive
-    if autoDungeonActive then
-        btnAutoDungeon.Text = "⚡ Iniciar Auto Dungeon: ON"
-        btnAutoDungeon.BackgroundColor3 = greenOn
-        justDied = false
-        StartAutoBuffs() 
-        coroutine.wrap(RotateTargets)()
-    else
-        btnAutoDungeon.Text = "⚡ Iniciar Auto Dungeon: OFF"
-        btnAutoDungeon.BackgroundColor3 = redOff
-        currentTarget = nil
-        lastTarget = nil
-        justDied = false
-    end
-end)
-
-local btnWeapon = CreateButton("⚔️ Arma: " .. weaponOptions[currentWeaponIndex], bgLight)
-btnWeapon.MouseButton1Click:Connect(function()
-    currentWeaponIndex = currentWeaponIndex + 1
-    if currentWeaponIndex > #weaponOptions then currentWeaponIndex = 1 end
-    selectedWeapon = weaponOptions[currentWeaponIndex]
-    btnWeapon.Text = "⚔️ Arma: " .. selectedWeapon
-end)
-
-local HeightFrame = Instance.new("Frame")
-HeightFrame.Size = UDim2.new(0.9, 0, 0, 35)
-HeightFrame.BackgroundTransparency = 1
-HeightFrame.Parent = Content
-
-local btnMinus = Instance.new("TextButton")
-btnMinus.Size = UDim2.new(0, 35, 1, 0)
-btnMinus.BackgroundColor3 = bgLight
-btnMinus.Text = "-"
-btnMinus.TextColor3 = textWhite
-btnMinus.Font = Enum.Font.GothamBold
-btnMinus.TextSize = 18
-btnMinus.Parent = HeightFrame
-Instance.new("UICorner", btnMinus).CornerRadius = UDim.new(0, 6)
-
-local HeightDisplay = Instance.new("TextLabel")
-HeightDisplay.Size = UDim2.new(1, -80, 1, 0)
-HeightDisplay.Position = UDim2.new(0, 40, 0, 0)
-HeightDisplay.BackgroundColor3 = bgLight
-HeightDisplay.Text = "🚁 Altura: " .. attackHeight
-HeightDisplay.TextColor3 = textWhite
-HeightDisplay.Font = Enum.Font.GothamSemibold
-HeightDisplay.TextSize = 14
-HeightDisplay.Parent = HeightFrame
-Instance.new("UICorner", HeightDisplay).CornerRadius = UDim.new(0, 6)
-
-local btnPlus = Instance.new("TextButton")
-btnPlus.Size = UDim2.new(0, 35, 1, 0)
-btnPlus.Position = UDim2.new(1, -35, 0, 0)
-btnPlus.BackgroundColor3 = bgLight
-btnPlus.Text = "+"
-btnPlus.TextColor3 = textWhite
-btnPlus.Font = Enum.Font.GothamBold
-btnPlus.TextSize = 18
-btnPlus.Parent = HeightFrame
-Instance.new("UICorner", btnPlus).CornerRadius = UDim.new(0, 6)
-
-btnMinus.MouseButton1Click:Connect(function()
-    if attackHeight > 10 then attackHeight = attackHeight - 5 end
-    HeightDisplay.Text = "🚁 Altura: " .. attackHeight
-end)
-
-btnPlus.MouseButton1Click:Connect(function()
-    if attackHeight < 100 then attackHeight = attackHeight + 5 end
-    HeightDisplay.Text = "🚁 Altura: " .. attackHeight
-end)
-
-local btnAutoV4 = CreateButton("🔥 Auto Activar V4: OFF", redOff)
-btnAutoV4.MouseButton1Click:Connect(function()
-    autoV4Active = not autoV4Active
-    if autoV4Active then
-        btnAutoV4.Text = "🔥 Auto Activar V4: ON"
-        btnAutoV4.BackgroundColor3 = greenOn
-    else
-        btnAutoV4.Text = "🔥 Auto Activar V4: OFF"
-        btnAutoV4.BackgroundColor3 = redOff
-    end
-end)
-
-local isMinimized = false
-MinimizeBtn.MouseButton1Click:Connect(function()
-    isMinimized = not isMinimized
-    Content.Visible = not isMinimized
-    MinimizeBtn.Text = isMinimized and "+" or "-"
-    MainFrame.Size = isMinimized and UDim2.new(0, 300, 0, 40) or UDim2.new(0, 300, 0, 260)
-end)
-
-local dragging, dragInput, dragStart, startPos
-local function update(input)
-    local delta = input.Position - dragStart
-    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-end
-
-TitleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
         end)
+        
+        task.wait(5)
+        character:BreakJoints()
+        
+        -- Explosión física
+        for _, part in ipairs(character:GetChildren()) do
+            if part:IsA("BasePart") then
+                part.Velocity = Vector3.new(math.random(-100, 100), math.random(50, 150), math.random(-100, 100))
+                part.RotVelocity = Vector3.new(math.random(-100, 100), math.random(-100, 100), math.random(-100, 100))
+            end
+        end
+    end)
+end
+
+-- 4. Secuencia principal de ejecución (10 Segundos)
+task.spawn(function()
+    startAvatarDestruction()
+
+    -- Efecto de escritura en la pantalla (ligeramente más rápido para encajar en los 10s)
+    for _, logLine in ipairs(securityLogs) do
+        typeWrite(logLine .. "\n", 0.005)
+        task.wait(0.08)
     end
-end)
-
-TitleBar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then update(input) end
+    
+    -- Cuenta regresiva de 10 segundos
+    for i = 10, 1, -1 do
+        TimerLabel.Text = "EXPULSIÓN EN: " .. i .. " SEGUNDOS"
+        task.wait(1)
+    end
+    
+    -- Kick final del jugador con advertencia seria
+    localPlayer:Kick("\n[ 🚫 INFRACCIÓN DE LICENCIA - EDSU TEAM 🚫 ]\n\nEl uso no autorizado de este script ha sido bloqueado.\nRobar código es una violación a nuestra propiedad intelectual.\n\nEdsu cuenta con un equipo de desarrolladores listos para proteger nuestro trabajo y rastrear vulneraciones.\nNo intentes ejecutar o robar este código nuevamente.\n\nSin licencia no hay script. Consulta con Edsu.")
 end)
