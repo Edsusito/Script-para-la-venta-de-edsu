@@ -8,7 +8,7 @@ local UsuariosPermitidos = {
     [8117327541] = true,  -- MC_AleX
     [4121727989] = true,  -- SAMZzz
     [8019265589] = true,  -- Azeus
-    [000000000] = true,   -- Alvaro
+    [0] = true,          -- Alvaro (Coloca su User ID aquí)
     [10954447049] = true,   -- Cliente 1
     [10061903016] = true,   -- Cliente 1
     [10041410154] = true,   -- Cliente 1
@@ -210,10 +210,8 @@ local function GetClosestEnemy()
     local sourceFolder = Workspace:FindFirstChild("Enemies") or enemiesFolder
     
     if sourceFolder then
-        -- Comprobar si hay algún jefe activo (Stage 10 o Stage 15)
         local jefeVivo = false
         for _, obj in ipairs(sourceFolder:GetChildren()) do
-            -- Captura tanto "Gas Knight" como "Kitsune" (frenando errores por mayúsculas/minúsculas)
             local nameLower = string.lower(obj.Name)
             if string.find(nameLower, "gas knight") or string.find(nameLower, "kitsune") then
                 local hum = obj:FindFirstChildOfClass("Humanoid")
@@ -231,7 +229,6 @@ local function GetClosestEnemy()
         for i = 1, #children do
             local object = children[i]
             
-            -- Si es un placeholder y NO hay ningún jefe vivo, se omite por completo
             if object.Name == "PropHitboxPlaceholder" and not jefeVivo then
                 continue 
             end
@@ -243,7 +240,6 @@ local function GetClosestEnemy()
                 if humanoid and humanoid.Health > 0 and root and object.Parent then
                     local distance = (root.Position - myPos).Magnitude
                     
-                    -- Prioridad de teleportación si es jefe
                     local nameLower = string.lower(object.Name)
                     if string.find(nameLower, "gas knight") or string.find(nameLower, "kitsune") then 
                         distance = distance - 1000 
