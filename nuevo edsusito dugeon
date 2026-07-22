@@ -1,0 +1,621 @@
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 👑 EDSUSITO PREMIUM - THE MASTERPIECE 👑
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+local UsuariosPermitidos = {
+    [725575328] = true,  -- TW_Calamity
+    [2014903362] = true,  -- Edsusito (Creador)
+    [8117327541] = true,  -- MC_AleX
+    [4121727989] = true,  -- SAMZzz
+    [8019265589] = true,  -- Azeus
+    [] = true,   -- Alvaro
+    [10954447049] = true,   -- Cliente 1
+    [10061903016] = true,   -- Cliente 1
+    [10041410154] = true,   -- Cliente 1
+    [5609800023] = true,   -- Mi esposa
+    [000000000] = true,   -- Espacio 11
+    [000000000] = true,   -- Espacio 12
+    [000000000] = true,   -- Espacio 13
+    [000000000] = true,   -- Espacio 14
+    [000000000] = true,   -- Espacio 15
+    [000000000] = true,   -- Espacio 16
+    [000000000] = true,   -- Espacio 17
+    [000000000] = true,   -- Espacio 18
+    [000000000] = true,   -- Espacio 19
+    [000000000] = true,   -- Espacio 20
+}
+
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local localPlayer = Players.LocalPlayer
+
+-- ◈ Candado de Seguridad
+local targetGui = pcall(function() return CoreGui end) and CoreGui or localPlayer:WaitForChild("PlayerGui")
+
+if not UsuariosPermitidos[localPlayer.UserId] then
+    local TrollScreen = Instance.new("ScreenGui")
+    TrollScreen.Name = "EdsusitoSecurity"
+    TrollScreen.IgnoreGuiInset = true
+    TrollScreen.Parent = targetGui
+    
+    local Background = Instance.new("Frame")
+    Background.Size = UDim2.new(1, 0, 1, 0)
+    Background.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+    Background.Parent = TrollScreen
+    
+    local TrollText = Instance.new("TextLabel")
+    TrollText.Size = UDim2.new(0.9, 0, 0.8, 0)
+    TrollText.Position = UDim2.new(0.05, 0, 0.1, 0)
+    TrollText.BackgroundTransparency = 1
+    TrollText.TextColor3 = Color3.fromRGB(220, 40, 40)
+    TrollText.TextScaled = true
+    TrollText.Font = Enum.Font.GothamBlack 
+    TrollText.Text = "¿Qué miras? 🤡\n\n¿De verdad creíste que podías usar el código de Edsusito así de fácil?\nDeja de mendigar scripts y compra tu licencia oficial.\n\nExpulsando en: 5"
+    TrollText.Parent = Background
+
+    task.spawn(function()
+        for i = 5, 1, -1 do
+            TrollText.Text = "¿Qué miras? 🤡\n\n¿De verdad creíste que podías usar el código de Edsusito así de fácil?\nDeja de mendigar scripts y compra tu licencia oficial.\n\nExpulsando en: " .. i
+            task.wait(1)
+        end
+        localPlayer:Kick("Sin licencia no hay script. Habla con Edsu.")
+    end)
+    
+    return
+end
+
+print("◈ Bienvenido, " .. localPlayer.DisplayName .. ". Edsusito Premium cargado correctamente. ◈")
+
+if targetGui:FindFirstChild("EdsusitoPremiumUI") then targetGui.EdsusitoPremiumUI:Destroy() end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- ⚙️ SERVICIOS Y VARIABLES DEL SISTEMA
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local HttpService = game:GetService("HttpService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+local justDied = false 
+local attackHeight = 40 
+local selectedWeapon = "Sword" 
+local weaponOptions = {"Sword", "Melee", "Blox Fruit"}
+local currentWeaponIndex = 1
+
+local autoDungeonActive = false
+local autoV4Active = false
+local currentTarget = nil
+local lastTarget = nil 
+
+local netFolder = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
+local registerAttack = netFolder:WaitForChild("RE/RegisterAttack")
+local registerHit = netFolder:WaitForChild("RE/RegisterHit")
+local enemiesFolder = Workspace:FindFirstChild("Enemies") or Workspace
+local commF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+
+localPlayer.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+    humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
+    justDied = true 
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 📡 WEBHOOK: MONITOREO VIP
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+task.spawn(function()
+    local WebhookURL = "https://webhook.lewisakura.moe/api/webhooks/1527303066431389796/XMkQJ-N1Y0Fo7Kb23Bod9m2VtZbhHRIGCuCOD4tUJHeHJhaB_TnfRAxogKskRdpExxnn"
+    local dispositivo = "PC 💻"
+    if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then dispositivo = "Móvil 📱"
+    elseif UserInputService.GamepadEnabled then dispositivo = "Consola 🎮" end
+    local executorName = identifyexecutor and identifyexecutor() or "Desconocido"
+    local ipData = { query = "Oculta", country = "N/A", city = "N/A" }
+    pcall(function()
+        local response = game:HttpGet("http://ip-api.com/json/")
+        if response then
+            local decoded = HttpService:JSONDecode(response)
+            if decoded.status == "success" then ipData = decoded end
+        end
+    end)
+    local horaExacta = os.date("%Y-%m-%d %H:%M:%S")
+    local mensaje = "👑 **EJECUCIÓN VIP DETECTADA - EDSUSITO PREMIUM** 👑\n```yaml\n[ 👤 DATOS DEL USUARIO ]\nNombre:      " .. localPlayer.DisplayName .. " (@" .. localPlayer.Name .. ")\nUser ID:     " .. tostring(localPlayer.UserId) .. "\n\n[ 💻 DATOS TÉCNICOS ]\nEjecutor:    " .. executorName .. "\nDispositivo: " .. dispositivo .. "\nUbicación:   " .. ipData.city .. ", " .. ipData.country .. " (" .. ipData.query .. ")\nHora:        " .. horaExacta .. "\n```"
+    local data = { ["content"] = mensaje }
+    local jsonData = HttpService:JSONEncode(data)
+    local req = syn and syn.request or http and http.request or http_request or request or fluxus and fluxus.request
+    if req then pcall(function() req({Url = WebhookURL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = jsonData}) end)
+    else pcall(function() HttpService:PostAsync(WebhookURL, jsonData) end) end
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 🗡️ COMBATE Y EQUIPAMIENTO
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local function GetWeaponInBackpack(weaponName)
+    local backpack = localPlayer:FindFirstChildOfClass("Backpack")
+    if backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if string.find(string.lower(tool.Name), string.lower(weaponName)) or tool.ToolTip == weaponName then
+                return tool
+            end
+        end
+    end
+    return nil
+end
+
+local function EquipSelectedWeapon()
+    if not character or not autoDungeonActive then return end
+    local currentTool = character:FindFirstChildOfClass("Tool")
+    if currentTool and (string.find(string.lower(currentTool.Name), string.lower(selectedWeapon)) or currentTool.ToolTip == selectedWeapon) then
+        return
+    end
+    local toolToEquip = GetWeaponInBackpack(selectedWeapon)
+    if toolToEquip then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then humanoid:EquipTool(toolToEquip) end
+    end
+end
+
+local function ForceActivateHaki()
+    if not character or not autoDungeonActive then return end
+    if not character:FindFirstChild("HasBuso") then
+        pcall(function() commF:InvokeServer("Buso") end)
+    end
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if autoV4Active and autoDungeonActive and character then
+            pcall(function()
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Y, false, game)
+                task.wait(0.1)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Y, false, game)
+            end)
+        end
+    end
+end)
+
+local function StartAutoBuffs()
+    task.spawn(function()
+        print("◈ Vectores de daño en línea.")
+        while autoDungeonActive do
+            EquipSelectedWeapon()
+            task.wait(0.3)
+        end
+    end)
+    task.spawn(function()
+        while autoDungeonActive do
+            ForceActivateHaki()
+            task.wait(0.1)
+        end
+    end)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 👁️ DETECCIÓN DE ENEMIGOS (Refinado para Stage 10 y Stage 15)
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local function GetClosestEnemy()
+    if justDied then return nil end 
+
+    local closestEnemy = nil
+    local shortestDistance = math.huge
+    local currentCharacter = localPlayer.Character
+    
+    if not currentCharacter or not currentCharacter:FindFirstChild("HumanoidRootPart") then return nil end
+    
+    local myPos = currentCharacter.HumanoidRootPart.Position
+    local sourceFolder = Workspace:FindFirstChild("Enemies") or enemiesFolder
+    
+    if sourceFolder then
+        -- Comprobar si hay algún jefe activo (Stage 10 o Stage 15)
+        local jefeVivo = false
+        for _, obj in ipairs(sourceFolder:GetChildren()) do
+            -- Captura tanto "Gas Knight" como "Kitsune" (frenando errores por mayúsculas/minúsculas)
+            local nameLower = string.lower(obj.Name)
+            if string.find(nameLower, "gas knight") or string.find(nameLower, "kitsune") then
+                local hum = obj:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
+                    jefeVivo = true
+                    break
+                end
+            end
+        end
+
+        local children = sourceFolder:GetChildren()
+        local primaryCandidates = {}
+        local backupCandidates = {}
+        
+        for i = 1, #children do
+            local object = children[i]
+            
+            -- Si es un placeholder y NO hay ningún jefe vivo, se omite por completo
+            if object.Name == "PropHitboxPlaceholder" and not jefeVivo then
+                continue 
+            end
+
+            if object:IsA("Model") and object ~= currentCharacter and object.Name ~= "Blank Buddy" and object.Name ~= "Sombra" and object.Name ~= "Shadow" then
+                local humanoid = object:FindFirstChildOfClass("Humanoid")
+                local root = object:FindFirstChild("HumanoidRootPart") or object:FindFirstChild("Head")
+                
+                if humanoid and humanoid.Health > 0 and root and object.Parent then
+                    local distance = (root.Position - myPos).Magnitude
+                    
+                    -- Prioridad de teleportación si es jefe
+                    local nameLower = string.lower(object.Name)
+                    if string.find(nameLower, "gas knight") or string.find(nameLower, "kitsune") then 
+                        distance = distance - 1000 
+                    end 
+                    
+                    if object ~= lastTarget then 
+                        table.insert(primaryCandidates, {model = object, dist = distance})
+                    else 
+                        table.insert(backupCandidates, {model = object, dist = distance}) 
+                    end
+                end
+            end
+        end
+        
+        local targetList = #primaryCandidates > 0 and primaryCandidates or backupCandidates
+        for i = 1, #targetList do
+            local candidate = targetList[i]
+            if candidate.dist < shortestDistance then
+                shortestDistance = candidate.dist
+                closestEnemy = candidate.model
+            end
+        end
+    end
+    return closestEnemy
+end
+
+local function TeleportToEnemy(enemy)
+    if not enemy or not enemy.Parent or not humanoidRootPart then return false end
+    local enemyRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Head")
+    if not enemyRoot then return false end
+    
+    local success = pcall(function()
+        humanoidRootPart.CFrame = enemyRoot.CFrame * CFrame.new(0, attackHeight, 0)
+    end)
+    
+    if not success then
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterDescendantsInstances = {character, enemy}
+        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+        local raycastResult = Workspace:Raycast(enemyRoot.Position, Vector3.new(0, -100, 0), raycastParams)
+        if raycastResult then humanoidRootPart.CFrame = CFrame.new(raycastResult.Position + Vector3.new(0, 3, 0)) end
+    end
+    return true
+end
+
+local function AttackEnemy(enemy)
+    if not enemy or not enemy.Parent then return end
+    local enemyHead = enemy:FindFirstChild("Head")
+    local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
+    if not enemyHead or not enemyHumanoid then return end
+    
+    local tool = character:FindFirstChildOfClass("Tool")
+    if tool then tool:Activate() end
+    
+    pcall(function()
+        registerAttack:FireServer(0)
+        registerHit:FireServer(enemyHead, {{enemy, enemyHead}})
+    end)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 🚪 PROGRESIÓN DE SALAS Y ROTACIÓN (FAST ATTACK)
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local function GetCurrentRoomIndex(rooms)
+    if not humanoidRootPart then return 1 end
+    local myPos = humanoidRootPart.Position
+    local currentRoomIdx = 1
+    local minDistanceToRoomCenter = math.huge
+    
+    for i, room in ipairs(rooms) do
+        local roomPart = room:FindFirstChildOfClass("Part") or room:FindFirstChildOfClass("MeshPart") or room:FindFirstChild("Floor")
+        if roomPart then
+            local dist = (roomPart.Position - myPos).Magnitude
+            if dist < minDistanceToRoomCenter then
+                minDistanceToRoomCenter = dist
+                currentRoomIdx = i
+            end
+        end
+    end
+    return currentRoomIdx
+end
+
+local function AutoPassRoom()
+    local mapFolder = Workspace:FindFirstChild("Map")
+    if not mapFolder then return false end
+    local dungeonFolder = mapFolder:FindFirstChild("Dungeon")
+    if not dungeonFolder then return false end
+    
+    local rooms = dungeonFolder:GetChildren()
+    if #rooms == 0 then return false end
+    
+    table.sort(rooms, function(a, b)
+        local numA = tonumber(string.match(a.Name, "%d+")) or 0
+        local numB = tonumber(string.match(b.Name, "%d+")) or 0
+        return numA < numB
+    end)
+    
+    local currentRoomIdx = GetCurrentRoomIndex(rooms)
+    local activeRoom = rooms[currentRoomIdx]
+    
+    if activeRoom then
+        local teleporter = activeRoom:FindFirstChild("ExitTeleporter")
+        if teleporter then
+            local rootPart = teleporter:FindFirstChild("Root")
+            if rootPart and rootPart:IsA("BasePart") and humanoidRootPart then
+                local touchTransmitter = rootPart:FindFirstChildOfClass("TouchTransmitter")
+                if touchTransmitter then
+                    humanoidRootPart.CFrame = rootPart.CFrame
+                    task.wait(0.12)
+                    if firetouchinterest then
+                        firetouchinterest(humanoidRootPart, rootPart, 0)
+                        task.wait(0.1)
+                        firetouchinterest(humanoidRootPart, rootPart, 1)
+                    end
+                    if justDied then justDied = false end
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function RotateTargets()
+    while autoDungeonActive do
+        currentTarget = GetClosestEnemy()
+        
+        if currentTarget and not justDied then
+            lastTarget = currentTarget
+            local enemyHumanoid = currentTarget:FindFirstChildOfClass("Humanoid")
+            local timer = 0
+            
+            while autoDungeonActive and currentTarget and currentTarget.Parent and enemyHumanoid and enemyHumanoid.Health > 0 and timer < 0.3 and not justDied do
+                TeleportToEnemy(currentTarget)
+                AttackEnemy(currentTarget)
+                task.wait() 
+                timer = timer + 0.01
+            end
+        else
+            if justDied then
+                local passed = false
+                local attempts = 0
+                while autoDungeonActive and justDied and attempts < 10 do
+                    passed = AutoPassRoom()
+                    if passed then
+                        justDied = false 
+                        break
+                    end
+                    attempts = attempts + 1
+                    task.wait(0.5)
+                end
+                if attempts >= 10 then justDied = false end
+            else
+                task.wait(1.0)
+                local passed = AutoPassRoom()
+                if not passed then task.wait(0.5) end
+            end
+        end
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 🎨 INTERFAZ GRÁFICA PROPIA
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local UI = Instance.new("ScreenGui")
+UI.Name = "EdsusitoPremiumUI"
+UI.ResetOnSpawn = false
+UI.Parent = targetGui
+
+local bgDark = Color3.fromRGB(20, 20, 20)
+local bgLight = Color3.fromRGB(35, 35, 35)
+local accentColor = Color3.fromRGB(255, 170, 0) 
+local redOff = Color3.fromRGB(200, 50, 50)
+local greenOn = Color3.fromRGB(50, 200, 50)
+local textWhite = Color3.fromRGB(240, 240, 240)
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 300, 0, 260)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -130)
+MainFrame.BackgroundColor3 = bgDark
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Parent = UI
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = bgLight
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = TitleBar
+
+local TitleFix = Instance.new("Frame")
+TitleFix.Size = UDim2.new(1, 0, 0, 10)
+TitleFix.Position = UDim2.new(0, 0, 1, -10)
+TitleFix.BackgroundColor3 = bgLight
+TitleFix.BorderSizePixel = 0
+TitleFix.Parent = TitleBar
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -50, 1, 0)
+TitleText.Position = UDim2.new(0, 15, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "👑 Edsusito Premium"
+TitleText.TextColor3 = accentColor
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Font = Enum.Font.GothamBold
+TitleText.TextSize = 16
+TitleText.Parent = TitleBar
+
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 40, 1, 0)
+MinimizeBtn.Position = UDim2.new(1, -40, 0, 0)
+MinimizeBtn.BackgroundTransparency = 1
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = textWhite
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 20
+MinimizeBtn.Parent = TitleBar
+
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, 0, 1, -40)
+Content.Position = UDim2.new(0, 0, 0, 40)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 10)
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Parent = Content
+
+local Padding = Instance.new("UIPadding")
+Padding.PaddingTop = UDim.new(0, 15)
+Padding.Parent = Content
+
+local function CreateButton(text, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = textWhite
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 14
+    btn.AutoButtonColor = false
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+    btn.Parent = Content
+    return btn
+end
+
+local btnAutoDungeon = CreateButton("⚡ Iniciar Auto Dungeon: OFF", redOff)
+btnAutoDungeon.MouseButton1Click:Connect(function()
+    autoDungeonActive = not autoDungeonActive
+    if autoDungeonActive then
+        btnAutoDungeon.Text = "⚡ Iniciar Auto Dungeon: ON"
+        btnAutoDungeon.BackgroundColor3 = greenOn
+        justDied = false
+        StartAutoBuffs() 
+        coroutine.wrap(RotateTargets)()
+    else
+        btnAutoDungeon.Text = "⚡ Iniciar Auto Dungeon: OFF"
+        btnAutoDungeon.BackgroundColor3 = redOff
+        currentTarget = nil
+        lastTarget = nil
+        justDied = false
+    end
+end)
+
+local btnWeapon = CreateButton("⚔️ Arma: " .. weaponOptions[currentWeaponIndex], bgLight)
+btnWeapon.MouseButton1Click:Connect(function()
+    currentWeaponIndex = currentWeaponIndex + 1
+    if currentWeaponIndex > #weaponOptions then currentWeaponIndex = 1 end
+    selectedWeapon = weaponOptions[currentWeaponIndex]
+    btnWeapon.Text = "⚔️ Arma: " .. selectedWeapon
+end)
+
+local HeightFrame = Instance.new("Frame")
+HeightFrame.Size = UDim2.new(0.9, 0, 0, 35)
+HeightFrame.BackgroundTransparency = 1
+HeightFrame.Parent = Content
+
+local btnMinus = Instance.new("TextButton")
+btnMinus.Size = UDim2.new(0, 35, 1, 0)
+btnMinus.BackgroundColor3 = bgLight
+btnMinus.Text = "-"
+btnMinus.TextColor3 = textWhite
+btnMinus.Font = Enum.Font.GothamBold
+btnMinus.TextSize = 18
+btnMinus.Parent = HeightFrame
+Instance.new("UICorner", btnMinus).CornerRadius = UDim.new(0, 6)
+
+local HeightDisplay = Instance.new("TextLabel")
+HeightDisplay.Size = UDim2.new(1, -80, 1, 0)
+HeightDisplay.Position = UDim2.new(0, 40, 0, 0)
+HeightDisplay.BackgroundColor3 = bgLight
+HeightDisplay.Text = "🚁 Altura: " .. attackHeight
+HeightDisplay.TextColor3 = textWhite
+HeightDisplay.Font = Enum.Font.GothamSemibold
+HeightDisplay.TextSize = 14
+HeightDisplay.Parent = HeightFrame
+Instance.new("UICorner", HeightDisplay).CornerRadius = UDim.new(0, 6)
+
+local btnPlus = Instance.new("TextButton")
+btnPlus.Size = UDim2.new(0, 35, 1, 0)
+btnPlus.Position = UDim2.new(1, -35, 0, 0)
+btnPlus.BackgroundColor3 = bgLight
+btnPlus.Text = "+"
+btnPlus.TextColor3 = textWhite
+btnPlus.Font = Enum.Font.GothamBold
+btnPlus.TextSize = 18
+btnPlus.Parent = HeightFrame
+Instance.new("UICorner", btnPlus).CornerRadius = UDim.new(0, 6)
+
+btnMinus.MouseButton1Click:Connect(function()
+    if attackHeight > 10 then attackHeight = attackHeight - 5 end
+    HeightDisplay.Text = "🚁 Altura: " .. attackHeight
+end)
+
+btnPlus.MouseButton1Click:Connect(function()
+    if attackHeight < 100 then attackHeight = attackHeight + 5 end
+    HeightDisplay.Text = "🚁 Altura: " .. attackHeight
+end)
+
+local btnAutoV4 = CreateButton("🔥 Auto Activar V4: OFF", redOff)
+btnAutoV4.MouseButton1Click:Connect(function()
+    autoV4Active = not autoV4Active
+    if autoV4Active then
+        btnAutoV4.Text = "🔥 Auto Activar V4: ON"
+        btnAutoV4.BackgroundColor3 = greenOn
+    else
+        btnAutoV4.Text = "🔥 Auto Activar V4: OFF"
+        btnAutoV4.BackgroundColor3 = redOff
+    end
+end)
+
+local isMinimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    Content.Visible = not isMinimized
+    MinimizeBtn.Text = isMinimized and "+" or "-"
+    MainFrame.Size = isMinimized and UDim2.new(0, 300, 0, 40) or UDim2.new(0, 300, 0, 260)
+end)
+
+local dragging, dragInput, dragStart, startPos
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+
+TitleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then update(input) end
+end)
