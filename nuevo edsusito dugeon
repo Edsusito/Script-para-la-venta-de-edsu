@@ -1,7 +1,3 @@
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 👑 EDSUSITO PREMIUM - THE MASTERPIECE 👑
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 local UsuariosPermitidos = {
     [725575328] = true,  -- TW_Calamity
     [2014903362] = true,  -- Edsusito (Creador)
