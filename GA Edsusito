@@ -1,0 +1,344 @@
+-- ============================================================
+-- GA EDSUSITO - ULTRA OPTIMIZED & COMPACT (ANIMATED FACE EDITION)
+-- ============================================================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+local player = Players.LocalPlayer
+
+-- Limpieza de interfaces previas
+local guiName = "GA_Edsusito_PixelCatUI"
+local parentTarget = (gethui and gethui()) or CoreGui or player:WaitForChild("PlayerGui")
+if parentTarget:FindFirstChild(guiName) then
+    parentTarget[guiName]:Destroy()
+end
+
+-- ============================================================
+-- GUI COMPACTA (190 x 110 px) Y LIGERA
+-- ============================================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = guiName
+screenGui.ResetOnSpawn = false
+screenGui.Parent = parentTarget
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 190, 0, 110)
+mainFrame.Position = UDim2.new(0.5, -95, 0.3, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner", mainFrame)
+corner.CornerRadius = UDim.new(0, 10)
+
+local stroke = Instance.new("UIStroke", mainFrame)
+stroke.Color = Color3.fromRGB(255, 120, 180) -- Rosa Gatito Neón
+stroke.Thickness = 1.2
+
+-- Título
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, -60, 0, 24) -- Ajustado para el circulito
+title.Position = UDim2.new(0, 10, 0, 4)
+title.BackgroundTransparency = 1
+title.Text = "GA Edsusito"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 11
+title.TextColor3 = Color3.fromRGB(255, 182, 193)
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- ============================================================
+-- CIRCULITO CON CARITA ANIMADA (CAMBIA EXPRESIONES CONSTANTEMENTE)
+-- ============================================================
+local catCircleContainer = Instance.new("Frame", mainFrame)
+catCircleContainer.Name = "CatCircle"
+catCircleContainer.Size = UDim2.new(0, 32, 0, 32) -- Pequeño círculo
+catCircleContainer.Position = UDim2.new(1, -38, 0, 4)
+catCircleContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+catCircleContainer.BorderSizePixel = 0
+
+local circleCorner = Instance.new("UICorner", catCircleContainer)
+circleCorner.CornerRadius = UDim.new(1, 0) -- Hace el frame un círculo perfecto
+
+local circleStroke = Instance.new("UIStroke", catCircleContainer)
+circleStroke.Color = Color3.fromRGB(255, 182, 193) -- Rosa suave para el borde
+circleStroke.Thickness = 1
+circleStroke.Transparency = 0.5
+
+-- Carita dentro del círculo
+local faceLabel = Instance.new("TextLabel", catCircleContainer)
+faceLabel.Name = "FaceExpression"
+faceLabel.Size = UDim2.new(1, 0, 1, 0)
+faceLabel.Position = UDim2.new(0, 0, 0, 0)
+faceLabel.BackgroundTransparency = 1
+faceLabel.Font = Enum.Font.Code
+faceLabel.TextSize = 14
+faceLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- Carita blanca
+faceLabel.TextYAlignment = Enum.TextYAlignment.Center
+faceLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+-- Lista de expresiones bonitas que cambian
+local faceExpressions = {
+    "•‿•", -- Feliz
+    "˘ω˘", -- Tierno/Dormido
+    "^_^", -- Muy Feliz
+    "・∀・", -- Sorprendido Feliz
+    "•ω•", -- Curioso
+    "T_T", -- Llorando (Opcional, por si acaso)
+}
+
+-- Bucle de animación constante para la carita
+task.spawn(function()
+    local idx = 1
+    while mainFrame and mainFrame.Parent do
+        -- Cambiar la expresión
+        faceLabel.Text = faceExpressions[idx]
+        idx = (idx % #faceExpressions) + 1
+        
+        -- Esperar un tiempo antes de cambiar de nuevo
+        task.wait(0.8) -- Cambia cada 0.8 segundos
+    end
+end)
+
+-- ============================================================
+-- ESTADO Y BOTONES ORIGINALES
+-- ============================================================
+-- Estado
+local statusLabel = Instance.new("TextLabel", mainFrame)
+statusLabel.Size = UDim2.new(1, -20, 0, 18)
+statusLabel.Position = UDim2.new(0, 10, 0, 28)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "• Dragon M1: OFF [K]"
+statusLabel.Font = Enum.Font.GothamMedium
+statusLabel.TextSize = 9
+statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Botón Principal
+local toggleBtn = Instance.new("TextButton", mainFrame)
+toggleBtn.Size = UDim2.new(1, -20, 0, 28)
+toggleBtn.Position = UDim2.new(0, 10, 0, 50)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(32, 32, 42)
+toggleBtn.Text = "ACTIVAR (K)"
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 10
+toggleBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
+
+local btnCorner = Instance.new("UICorner", toggleBtn)
+btnCorner.CornerRadius = UDim.new(0, 6)
+
+local infoLabel = Instance.new("TextLabel", mainFrame)
+infoLabel.Size = UDim2.new(1, -20, 0, 16)
+infoLabel.Position = UDim2.new(0, 10, 1, -18)
+infoLabel.BackgroundTransparency = 1
+infoLabel.Text = "Tecla 'N' = Ocultar GUI"
+infoLabel.Font = Enum.Font.Gotham
+infoLabel.TextSize = 8
+infoLabel.TextColor3 = Color3.fromRGB(130, 130, 140)
+infoLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Arrastre sin Lag (Sincronización Directa)
+local dragging, dragStart, startPos
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+    end
+end)
+
+mainFrame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- ============================================================
+-- LÓGICA M1 Y REMOTES (OPTIMIZADA SIN LAG) - SIN CAMBIOS
+-- ============================================================
+local DragonModules = ReplicatedStorage:WaitForChild("Modules", 5)
+local DragonNet = DragonModules and DragonModules:WaitForChild("Net", 5)
+local ShootGunEvent = DragonNet and DragonNet:WaitForChild("RE/ShootGunEvent", 5)
+local Validator2 = ReplicatedStorage:WaitForChild("Remotes", 5):WaitForChild("Validator2", 5)
+
+local getupval = debug.getupvalue or getupvalue
+local setupval = debug.setupvalue or setupvalue
+local getupvals = debug.getupvalues or getupvalues
+
+local ShootFunction
+local V_Idx = { v26 = 12, v22 = 13, v25 = 14, v21 = 15, v23 = 16, v24 = 17, v27 = 18 }
+
+local function InitDragonGun()
+    local success, result = pcall(require, ReplicatedStorage:WaitForChild("Controllers"):WaitForChild("CombatController"))
+    if success and type(result) == "table" and result.Attack then
+        ShootFunction = getupval(result.Attack, 9)
+    end
+end
+
+local function GetNextValidator()
+    if not ShootFunction then InitDragonGun() end
+    if not ShootFunction then return 0, 0 end
+    local upvals = getupvals(ShootFunction)
+    if not upvals then return 0, 0 end
+    if upvals[V_Idx.v21] ~= 727595 then
+        for i, v in pairs(upvals) do
+            if v == 727595 then
+                local offset = i - 15
+                V_Idx.v21 = i; V_Idx.v22 = 13 + offset; V_Idx.v23 = 16 + offset
+                V_Idx.v24 = 17 + offset; V_Idx.v26 = 12 + offset; V_Idx.v25 = 14 + offset
+                V_Idx.v27 = 18 + offset
+                break
+            end
+        end
+    end
+    local v1 = getupval(ShootFunction, V_Idx.v21)
+    local v2 = getupval(ShootFunction, V_Idx.v22)
+    local v3 = getupval(ShootFunction, V_Idx.v23)
+    local v4 = getupval(ShootFunction, V_Idx.v24)
+    local v5 = getupval(ShootFunction, V_Idx.v25)
+    local v6 = getupval(ShootFunction, V_Idx.v26)
+    local v7 = getupval(ShootFunction, V_Idx.v27)
+    if not (v1 and v2 and v3 and v4 and v5 and v6 and v7) then return 0, 0 end
+    local v8 = v6 * v2
+    local v9 = (v5 * v2 + v6 * v1) % v3
+    v9 = (v9 * v3 + v8) % v4
+    v5 = math.floor(v9 / v3)
+    v6 = v9 - v5 * v3
+    v7 = v7 + 1
+    setupval(ShootFunction, V_Idx.v25, v5)
+    setupval(ShootFunction, V_Idx.v26, v6)
+    setupval(ShootFunction, V_Idx.v27, v7)
+    return math.floor(v9 / v4 * 16777215), v7
+end
+
+-- ============================================================
+-- BÚSQUEDA Y FILTROS DE OBJETIVOS (3000 STUDS) - SIN CAMBIOS
+-- ============================================================
+local function isAlly(targetPlayer)
+    if not targetPlayer or targetPlayer == player then return true end
+    if player.Team and targetPlayer.Team and player.Team.Name == "Marines" and targetPlayer.Team.Name == "Marines" then
+        return true
+    end
+    pcall(function()
+        local mainGui = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("Main")
+        local alliesFrame = mainGui and mainGui:FindFirstChild("Allies")
+            and mainGui.Allies:FindFirstChild("Container")
+            and mainGui.Allies.Container:FindFirstChild("Allies")
+            and mainGui.Allies.Container.Allies:FindFirstChild("ScrollingFrame")
+            and mainGui.Allies.Container.Allies:FindFirstChild("Frame")
+        if alliesFrame and alliesFrame:FindFirstChild(targetPlayer.Name) then return true end
+    end)
+    return false
+end
+
+local function GetClosestTarget()
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    
+    local closest, dist = nil, 3000 -- Alcance máximo
+    local myPos = root.Position
+    
+    local enemiesFolder = workspace:FindFirstChild("Enemies")
+    if enemiesFolder then
+        for _, enemy in pairs(enemiesFolder:GetChildren()) do
+            local hum = enemy:FindFirstChildOfClass("Humanoid")
+            local r = enemy:FindFirstChild("HumanoidRootPart")
+            if hum and hum.Health > 0 and r then
+                local d = (r.Position - myPos).Magnitude
+                if d <= dist then dist = d; closest = r end
+            end
+        end
+    end
+    
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and not isAlly(p) and p.Character then
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            local r = p.Character:FindFirstChild("HumanoidRootPart")
+            local pvpDisabled = p:GetAttribute("PvpDisabled")
+            if hum and hum.Health > 0 and r and not pvpDisabled then
+                local d = (r.Position - myPos).Magnitude
+                if d <= dist then dist = d; closest = r end
+            end
+        end
+    end
+    return closest
+end
+
+-- ============================================================
+-- CONTROL DE ACTIVACIÓN - SIN CAMBIOS
+-- ============================================================
+_G.DragonAttackActive = false
+local isOpen = true
+
+local function toggleActiveState()
+    _G.DragonAttackActive = not _G.DragonAttackActive
+    if _G.DragonAttackActive then
+        statusLabel.Text = "• Dragon M1: ON [K]"
+        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+        stroke.Color = Color3.fromRGB(0, 255, 150)
+        toggleBtn.Text = "DESACTIVAR (K)"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 90)
+    else
+        statusLabel.Text = "• Dragon M1: OFF [K]"
+        statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        stroke.Color = Color3.fromRGB(255, 120, 180)
+        toggleBtn.Text = "ACTIVAR (K)"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(32, 32, 42)
+    end
+end
+
+toggleBtn.MouseButton1Click:Connect(toggleActiveState)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.N then
+        isOpen = not isOpen
+        mainFrame.Visible = isOpen
+    end
+    if input.KeyCode == Enum.KeyCode.K then
+        toggleActiveState()
+    end
+end)
+
+-- Bucle Estable (0.065s para evitar bloqueos del servidor)
+task.spawn(function()
+    InitDragonGun()
+    while true do
+        task.wait(0.065)
+        if _G.DragonAttackActive then
+            pcall(function()
+                local char = player.Character
+                local tool = char and char:FindFirstChildOfClass("Tool")
+                if not tool or tool.ToolTip ~= "Gun" then return end
+                
+                local target = GetClosestTarget()
+                if not target then return end
+                
+                local code, count = GetNextValidator()
+                if code ~= 0 and Validator2 then 
+                    Validator2:FireServer(code, count) 
+                end
+                
+                tool:SetAttribute("LocalOverheat", 0)
+                tool:SetAttribute("LocalTotalShots", 0)
+                
+                if ShootGunEvent then
+                    ShootGunEvent:FireServer(target.Position, { target })
+                end
+            end)
+        end
+    end
+end)
+
+print("GA Edsusito (Animated Face) Cargado con Éxito.")
