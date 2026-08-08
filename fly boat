@@ -1,0 +1,452 @@
+-- ==========================================
+-- 🛥️ EDSUSITO BOAT FLY V5 (Estable + 5 Bailes + GUI Clásica)
+-- ==========================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local player = Players.LocalPlayer
+
+-- Configuración de Variables
+local isFlying = false
+local isAuto = false
+local isDancing = false
+local isTweening = false
+local defaultSpeed = 150
+local targetHeight = 50 
+local currentDance = "Vaca"
+
+local lv, ao, attachment, renderConnection, trackerConnection
+local activeTween = nil 
+local lastBoatSeat = nil
+
+-- ==========================================
+-- 1. SISTEMA DE RASTREO Y BÚSQUEDA DE BARCO
+-- ==========================================
+local trackerGui = Instance.new("BillboardGui")
+trackerGui.Name = "EdsuBoatTracker"
+trackerGui.AlwaysOnTop = true
+trackerGui.Size = UDim2.new(0, 150, 0, 50)
+trackerGui.StudsOffset = Vector3.new(0, 8, 0) 
+
+local trackerText = Instance.new("TextLabel")
+trackerText.Size = UDim2.new(1, 0, 1, 0)
+trackerText.BackgroundTransparency = 1
+trackerText.TextColor3 = Color3.fromRGB(0, 255, 255) 
+trackerText.TextStrokeTransparency = 0
+trackerText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+trackerText.TextScaled = true
+trackerText.Font = Enum.Font.SourceSansBold
+trackerText.Parent = trackerGui
+
+local function monitorSeating(character)
+    local humanoid = character:WaitForChild("Humanoid", 5)
+    if humanoid then
+        humanoid:GetPropertyChangedSignal("SeatPart"):Connect(function()
+            if humanoid.SeatPart then
+                lastBoatSeat = humanoid.SeatPart
+                trackerGui.Adornee = lastBoatSeat
+                if not trackerGui.Parent then trackerGui.Parent = CoreGui end
+            end
+        end)
+    end
+end
+
+trackerConnection = RunService.Heartbeat:Connect(function()
+    if lastBoatSeat and lastBoatSeat.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local myPos = player.Character.HumanoidRootPart.Position
+        local boatPos = lastBoatSeat.Position
+        local dist = (boatPos - myPos).Magnitude
+        trackerText.Text = string.format("🛥️ Tu Barco\n[%d m]", math.floor(dist))
+        trackerGui.Enabled = true
+    else
+        trackerGui.Enabled = false
+    end
+end)
+
+if player.Character then monitorSeating(player.Character) end
+player.CharacterAdded:Connect(monitorSeating)
+
+local function GetBestBoatSeat()
+    local boatsFolder = workspace:FindFirstChild("Boats")
+    if boatsFolder then
+        for _, boat in pairs(boatsFolder:GetChildren()) do
+            local owner = boat:FindFirstChild("Owner")
+            if owner and tostring(owner.Value) == tostring(player.Name) then
+                local seat = boat:FindFirstChild("VehicleSeat") or boat:FindFirstChildWhichIsA("VehicleSeat", true)
+                if seat then
+                    lastBoatSeat = seat 
+                    trackerGui.Adornee = lastBoatSeat
+                    if not trackerGui.Parent then trackerGui.Parent = CoreGui end
+                    return seat
+                end
+            end
+        end
+    end
+    return lastBoatSeat
+end
+
+-- ==========================================
+-- 2. GUI CLÁSICA (Sin Fling, Espacios Reajustados)
+-- ==========================================
+if CoreGui:FindFirstChild("BoatFlyGUI") then CoreGui.BoatFlyGUI:Destroy() end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "BoatFlyGUI"
+ScreenGui.Parent = CoreGui 
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 200, 0, 380) 
+MainFrame.Position = UDim2.new(0.8, 0, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Active = true
+MainFrame.Draggable = true 
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -60, 1, 0)
+Title.Position = UDim2.new(0, 5, 0, 0)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Text = "🛥️ Boat Fly Panel"
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 16
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 30, 1, 0)
+MinimizeBtn.Position = UDim2.new(1, -60, 0, 0)
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.Text = "-"
+MinimizeBtn.Font = Enum.Font.SourceSansBold
+MinimizeBtn.TextSize = 20
+MinimizeBtn.BorderSizePixel = 0
+MinimizeBtn.Parent = TitleBar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 1, 0)
+CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Text = "X"
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 16
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Parent = TitleBar
+
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, 0, 1, -30)
+Content.Position = UDim2.new(0, 0, 0, 30)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
+
+local function CreateButton(text, pos, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 30)
+    btn.Position = pos
+    btn.BackgroundColor3 = color
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Text = text
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 15
+    btn.BorderSizePixel = 0
+    btn.Parent = Content
+    return btn
+end
+
+-- Reajuste de posiciones (Y) tras eliminar el botón del Modo Diablo
+local FindBtn = CreateButton("🔍 BUSCAR MI BARCO", UDim2.new(0.05, 0, 0, 10), Color3.fromRGB(200, 150, 20))
+local ToggleBtn = CreateButton("VUELO MANUAL: OFF", UDim2.new(0.05, 0, 0, 45), Color3.fromRGB(200, 50, 50))
+local AutoBtn = CreateButton("AUTO AVANCE: OFF", UDim2.new(0.05, 0, 0, 80), Color3.fromRGB(50, 100, 200))
+
+local SpeedInput = Instance.new("TextBox")
+SpeedInput.Size = UDim2.new(0.9, 0, 0, 25)
+SpeedInput.Position = UDim2.new(0.05, 0, 0, 115)
+SpeedInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+SpeedInput.TextColor3 = Color3.new(1, 1, 1)
+SpeedInput.Text = tostring(defaultSpeed)
+SpeedInput.PlaceholderText = "Velocidad"
+SpeedInput.BorderSizePixel = 0
+SpeedInput.Parent = Content
+
+local HeightInput = Instance.new("TextBox")
+HeightInput.Size = UDim2.new(0.9, 0, 0, 25)
+HeightInput.Position = UDim2.new(0.05, 0, 0, 145)
+HeightInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+HeightInput.TextColor3 = Color3.new(1, 1, 1)
+HeightInput.Text = tostring(targetHeight)
+HeightInput.PlaceholderText = "Altura Y"
+HeightInput.BorderSizePixel = 0
+HeightInput.Parent = Content
+
+local DanceBtn = CreateButton("🐄 MODO BAILE: OFF", UDim2.new(0.05, 0, 0, 180), Color3.fromRGB(150, 50, 200))
+local DropdownBtn = CreateButton("Baile: Vaca Polaca ▼", UDim2.new(0.05, 0, 0, 215), Color3.fromRGB(40, 40, 40))
+DropdownBtn.TextSize = 14
+
+local DropdownList = Instance.new("Frame")
+DropdownList.Size = UDim2.new(0.9, 0, 0, 125)
+DropdownList.Position = UDim2.new(0.05, 0, 0, 245)
+DropdownList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+DropdownList.Visible = false
+DropdownList.ZIndex = 5
+DropdownList.BorderSizePixel = 1
+DropdownList.BorderColor3 = Color3.fromRGB(0, 0, 0)
+DropdownList.Parent = Content
+
+local UIListLayout = Instance.new("UIListLayout", DropdownList)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Solo los 5 bailes estables solicitados
+local bailes = {
+    {"🐄 Vaca Polaca", "Vaca"},
+    {"🥴 Borracho", "Borracho"},
+    {"✅ Decir que Sí", "Si"},
+    {"❌ Decir que No", "No"},
+    {"🎉 Muy Feliz", "Feliz"}
+}
+
+for i, baileInfo in ipairs(bailes) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 25)
+    btn.BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(40, 40, 40) or Color3.fromRGB(50, 50, 50)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = "  " .. baileInfo[1]
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 14
+    btn.ZIndex = 6
+    btn.BorderSizePixel = 0
+    btn.Parent = DropdownList
+    
+    btn.MouseButton1Click:Connect(function()
+        currentDance = baileInfo[2]
+        DropdownBtn.Text = "Baile: " .. baileInfo[1] .. " ▼"
+        DropdownList.Visible = false
+    end)
+end
+
+DropdownBtn.MouseButton1Click:Connect(function() DropdownList.Visible = not DropdownList.Visible end)
+
+local isMinimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    Content.Visible = not isMinimized
+    MinimizeBtn.Text = isMinimized and "+" or "-"
+    MainFrame.Size = isMinimized and UDim2.new(0, 200, 0, 30) or UDim2.new(0, 200, 0, 380)
+end)
+
+-- ==========================================
+-- 3. LÓGICA DE VUELO Y CANCELACIÓN
+-- ==========================================
+local function stopFlying()
+    isFlying = false
+    isAuto = false
+    isDancing = false
+    
+    ToggleBtn.Text = "VUELO MANUAL: OFF"
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    AutoBtn.Text = "AUTO AVANCE: OFF"
+    AutoBtn.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
+    DanceBtn.Text = "🐄 MODO BAILE: OFF"
+    DanceBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 200)
+    
+    if renderConnection then renderConnection:Disconnect() renderConnection = nil end
+    if lv then lv:Destroy() lv = nil end
+    if ao then ao:Destroy() ao = nil end
+    if attachment then attachment:Destroy() attachment = nil end
+end
+
+CloseBtn.MouseButton1Click:Connect(function()
+    stopFlying()
+    if trackerConnection then trackerConnection:Disconnect() end
+    if trackerGui then trackerGui:Destroy() end
+    ScreenGui:Destroy()
+end)
+
+local function TweenToBoat(callback)
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char and char:FindFirstChild("Humanoid")
+    if not hrp or not humanoid then return end
+
+    if isTweening then
+        if activeTween then activeTween:Cancel() end
+        isTweening = false
+        hrp.Anchored = false 
+        FindBtn.Text = "🔍 BUSCAR MI BARCO"
+        FindBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 20)
+        return
+    end
+    
+    local bestSeat = GetBestBoatSeat()
+    if not bestSeat or not bestSeat.Parent then
+        FindBtn.Text = "❌ SIN BARCO"
+        task.wait(1)
+        FindBtn.Text = "🔍 BUSCAR MI BARCO"
+        return
+    end
+    
+    isTweening = true
+    FindBtn.Text = "🛑 CANCELAR VIAJE"
+    FindBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    
+    local dist = (bestSeat.Position - hrp.Position).Magnitude
+    local tweenTime = dist / 250
+    
+    hrp.Anchored = true
+    local tweenInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Linear)
+    activeTween = TweenService:Create(hrp, tweenInfo, {CFrame = bestSeat.CFrame})
+    activeTween:Play()
+    
+    local connection
+    connection = activeTween.Completed:Connect(function(playbackState)
+        connection:Disconnect()
+        activeTween = nil
+        
+        if not isTweening then return end 
+        
+        isTweening = false
+        if playbackState == Enum.PlaybackState.Completed then
+            hrp.Anchored = false
+            bestSeat:Sit(humanoid)
+            
+            task.wait(0.2)
+            FindBtn.Text = "🔍 BUSCAR MI BARCO"
+            FindBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 20)
+            if callback then callback() end
+        end
+    end)
+end
+
+local function startFlying(mode)
+    if isTweening then return end 
+    
+    local char = player.Character
+    if not char then return end
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    if not humanoid.SeatPart then
+        TweenToBoat(function() startFlying(mode) end)
+        return
+    end
+    
+    local seat = humanoid.SeatPart
+    stopFlying()
+    
+    attachment = Instance.new("Attachment")
+    attachment.Parent = seat
+    
+    lv = Instance.new("LinearVelocity")
+    lv.Attachment0 = attachment
+    lv.MaxForce = math.huge
+    lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+    lv.Parent = seat
+    
+    ao = Instance.new("AlignOrientation")
+    ao.Attachment0 = attachment
+    ao.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    ao.MaxTorque = math.huge
+    ao.Responsiveness = 200
+    ao.Parent = seat
+    
+    isFlying = true
+    isAuto = (mode == "Auto")
+    isDancing = (mode == "Dance")
+    
+    if isAuto then
+        AutoBtn.Text = "AUTO AVANCE: ON"
+        AutoBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    elseif isDancing then
+        DanceBtn.Text = "🐄 MODO BAILE: ON"
+        DanceBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 200)
+    else
+        ToggleBtn.Text = "VUELO MANUAL: ON"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    end
+    
+    renderConnection = RunService.Heartbeat:Connect(function()
+        if not char or not humanoid or not humanoid.SeatPart or humanoid.SeatPart ~= seat then
+            stopFlying() 
+            return
+        end
+        
+        local currentY = seat.Position.Y
+        local currentSpeed = tonumber(SpeedInput.Text) or defaultSpeed
+        local currentTargetHeight = tonumber(HeightInput.Text) or targetHeight
+        local cam = workspace.CurrentCamera
+        
+        -- Orientación base alineada con la cámara
+        local lookVec = cam.CFrame.LookVector
+        local forwardDir = Vector3.new(lookVec.X, 0, lookVec.Z).Unit
+        local baseCFrame = CFrame.lookAt(Vector3.zero, forwardDir)
+        
+        local timeVar = tick()
+        
+        if isDancing then
+            if currentDance == "Vaca" then
+                lv.VectorVelocity = Vector3.new(0, math.sin(timeVar * 12) * 25, 0)
+                ao.CFrame = baseCFrame * CFrame.Angles(math.rad(40) + (math.sin(timeVar * 12) * 0.15), math.sin(timeVar * 6) * 1.2, math.cos(timeVar * 12) * 0.3)
+                
+            elseif currentDance == "Borracho" then
+                lv.VectorVelocity = Vector3.new(math.sin(timeVar * 1.5) * 20, math.sin(timeVar * 2) * 15, math.cos(timeVar * 1.2) * 20)
+                ao.CFrame = baseCFrame * CFrame.Angles(math.sin(timeVar * 3) * 0.4, math.sin(timeVar * 1.5) * 2, math.cos(timeVar * 2) * 0.4)
+                
+            elseif currentDance == "Si" then
+                lv.VectorVelocity = Vector3.new(0, 0, 0)
+                ao.CFrame = baseCFrame * CFrame.Angles(math.sin(timeVar * 6) * 0.6, 0, 0)
+                
+            elseif currentDance == "No" then
+                lv.VectorVelocity = Vector3.new(0, 0, 0)
+                ao.CFrame = baseCFrame * CFrame.Angles(0, math.sin(timeVar * 7) * 0.7, 0)
+                
+            elseif currentDance == "Feliz" then
+                lv.VectorVelocity = Vector3.new(0, math.abs(math.sin(timeVar * 10)) * 30, 0)
+                ao.CFrame = baseCFrame * CFrame.Angles(math.sin(timeVar * 15) * 0.1, 0, 0)
+            end
+            
+        elseif isAuto then
+            local yVelocity = (currentTargetHeight - currentY) * 3 
+            lv.VectorVelocity = Vector3.new(forwardDir.X * currentSpeed, yVelocity, forwardDir.Z * currentSpeed)
+            ao.CFrame = baseCFrame
+            
+        else
+            local moveDir = humanoid.MoveDirection 
+            local yVelocity = (currentTargetHeight - currentY) * 3 
+            lv.VectorVelocity = Vector3.new(moveDir.X * currentSpeed, yVelocity, moveDir.Z * currentSpeed)
+            ao.CFrame = baseCFrame
+        end
+    end)
+end
+
+-- ==========================================
+-- 4. EVENTOS DE LOS BOTONES
+-- ==========================================
+FindBtn.MouseButton1Click:Connect(function() TweenToBoat(nil) end)
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    if isFlying and not isAuto and not isDancing then stopFlying() else
+        stopFlying() startFlying("Manual")
+    end
+end)
+
+AutoBtn.MouseButton1Click:Connect(function()
+    if isFlying and isAuto then stopFlying() else
+        stopFlying() startFlying("Auto")
+    end
+end)
+
+DanceBtn.MouseButton1Click:Connect(function()
+    if isFlying and isDancing then stopFlying() else
+        stopFlying() startFlying("Dance")
+    end
+end)
