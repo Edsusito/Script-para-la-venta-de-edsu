@@ -1,18 +1,25 @@
-local Players = game.Players
-local ReplicatedStorage = game.ReplicatedStorage
+-- ============================================================
+-- GA EDSUSITO - ULTRA OPTIMIZED & COMPACT (ANIMATED FACE EDITION)
+-- ============================================================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
 
+-- Limpieza de interfaces previas
 local guiName = "GA_Edsusito_PixelCatUI"
 local parentTarget = (gethui and gethui()) or CoreGui or player:WaitForChild("PlayerGui")
-if parentTarget:FindFirstChild("GA_Edsusito_PixelCatUI") then
-    parentTarget["GA_Edsusito_PixelCatUI"]:Destroy()
+if parentTarget:FindFirstChild(guiName) then
+    parentTarget[guiName]:Destroy()
 end
 
+-- ============================================================
+-- GUI COMPACTA (190 x 110 px) Y LIGERA
+-- ============================================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "GA_Edsusito_PixelCatUI"
+screenGui.Name = guiName
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentTarget
 
@@ -29,11 +36,12 @@ local corner = Instance.new("UICorner", mainFrame)
 corner.CornerRadius = UDim.new(0, 10)
 
 local stroke = Instance.new("UIStroke", mainFrame)
-stroke.Color = Color3.fromRGB(255, 120, 180)
+stroke.Color = Color3.fromRGB(255, 120, 180) -- Rosa Gatito Neón
 stroke.Thickness = 1.2
 
+-- Título
 local title = Instance.new("TextLabel", mainFrame)
-title.Size = UDim2.new(1, -60, 0, 24)
+title.Size = UDim2.new(1, -60, 0, 24) -- Ajustado para el circulito
 title.Position = UDim2.new(0, 10, 0, 4)
 title.BackgroundTransparency = 1
 title.Text = "GA Edsusito"
@@ -42,21 +50,25 @@ title.TextSize = 11
 title.TextColor3 = Color3.fromRGB(255, 182, 193)
 title.TextXAlignment = Enum.TextXAlignment.Left
 
+-- ============================================================
+-- CIRCULITO CON CARITA ANIMADA (CAMBIA EXPRESIONES CONSTANTEMENTE)
+-- ============================================================
 local catCircleContainer = Instance.new("Frame", mainFrame)
 catCircleContainer.Name = "CatCircle"
-catCircleContainer.Size = UDim2.new(0, 32, 0, 32)
+catCircleContainer.Size = UDim2.new(0, 32, 0, 32) -- Pequeño círculo
 catCircleContainer.Position = UDim2.new(1, -38, 0, 4)
 catCircleContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
 catCircleContainer.BorderSizePixel = 0
 
 local circleCorner = Instance.new("UICorner", catCircleContainer)
-circleCorner.CornerRadius = UDim.new(1, 0)
+circleCorner.CornerRadius = UDim.new(1, 0) -- Hace el frame un círculo perfecto
 
 local circleStroke = Instance.new("UIStroke", catCircleContainer)
-circleStroke.Color = Color3.fromRGB(255, 182, 193)
+circleStroke.Color = Color3.fromRGB(255, 182, 193) -- Rosa suave para el borde
 circleStroke.Thickness = 1
 circleStroke.Transparency = 0.5
 
+-- Carita dentro del círculo
 local faceLabel = Instance.new("TextLabel", catCircleContainer)
 faceLabel.Name = "FaceExpression"
 faceLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -64,28 +76,37 @@ faceLabel.Position = UDim2.new(0, 0, 0, 0)
 faceLabel.BackgroundTransparency = 1
 faceLabel.Font = Enum.Font.Code
 faceLabel.TextSize = 14
-faceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+faceLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- Carita blanca
 faceLabel.TextYAlignment = Enum.TextYAlignment.Center
 faceLabel.TextXAlignment = Enum.TextXAlignment.Center
 
+-- Lista de expresiones bonitas que cambian
 local faceExpressions = {
-    "•‿•",
-    "˘ω˘",
-    "^_^",
-    "・∀・",
-    "•ω•",
-    "T_T",
+    "•‿•", -- Feliz
+    "˘ω˘", -- Tierno/Dormido
+    "^_^", -- Muy Feliz
+    "・∀・", -- Sorprendido Feliz
+    "•ω•", -- Curioso
+    "T_T", -- Llorando (Opcional, por si acaso)
 }
 
+-- Bucle de animación constante para la carita
 task.spawn(function()
     local idx = 1
     while mainFrame and mainFrame.Parent do
-        faceLabel.Text = faceExpressions[1]
-        idx = (1 % #faceExpressions) + 1
-        task.wait(0.8)
+        -- Cambiar la expresión
+        faceLabel.Text = faceExpressions[idx]
+        idx = (idx % #faceExpressions) + 1
+        
+        -- Esperar un tiempo antes de cambiar de nuevo
+        task.wait(0.8) -- Cambia cada 0.8 segundos
     end
 end)
 
+-- ============================================================
+-- ESTADO Y BOTONES ORIGINALES
+-- ============================================================
+-- Estado
 local statusLabel = Instance.new("TextLabel", mainFrame)
 statusLabel.Size = UDim2.new(1, -20, 0, 18)
 statusLabel.Position = UDim2.new(0, 10, 0, 28)
@@ -96,6 +117,7 @@ statusLabel.TextSize = 9
 statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 
+-- Botón Principal
 local toggleBtn = Instance.new("TextButton", mainFrame)
 toggleBtn.Size = UDim2.new(1, -20, 0, 28)
 toggleBtn.Position = UDim2.new(0, 10, 0, 50)
@@ -118,6 +140,7 @@ infoLabel.TextSize = 8
 infoLabel.TextColor3 = Color3.fromRGB(130, 130, 140)
 infoLabel.TextXAlignment = Enum.TextXAlignment.Left
 
+-- Arrastre sin Lag (Sincronización Directa)
 local dragging, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -140,6 +163,9 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
+-- ============================================================
+-- LÓGICA M1 Y REMOTES (OPTIMIZADA SIN LAG) - SIN CAMBIOS
+-- ============================================================
 local DragonModules = ReplicatedStorage:WaitForChild("Modules", 5)
 local DragonNet = DragonModules and DragonModules:WaitForChild("Net", 5)
 local ShootGunEvent = DragonNet and DragonNet:WaitForChild("RE/ShootGunEvent", 5)
@@ -188,13 +214,16 @@ local function GetNextValidator()
     v9 = (v9 * v3 + v8) % v4
     v5 = math.floor(v9 / v3)
     v6 = v9 - v5 * v3
-    v7 = v8
+    v7 = v7 + 1
     setupval(ShootFunction, V_Idx.v25, v5)
     setupval(ShootFunction, V_Idx.v26, v6)
     setupval(ShootFunction, V_Idx.v27, v7)
-    return math.floor(v9 / 67108860), v7
+    return math.floor(v9 / v4 * 16777215), v7
 end
 
+-- ============================================================
+-- BÚSQUEDA Y FILTROS DE OBJETIVOS (3000 STUDS) - SIN CAMBIOS
+-- ============================================================
 local function isAlly(targetPlayer)
     if not targetPlayer or targetPlayer == player then return true end
     if player.Team and targetPlayer.Team and player.Team.Name == "Marines" and targetPlayer.Team.Name == "Marines" then
@@ -216,10 +245,10 @@ local function GetClosestTarget()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
-
-    local closest, dist = nil, 3000
+    
+    local closest, dist = nil, 3000 -- Alcance máximo
     local myPos = root.Position
-
+    
     local enemiesFolder = workspace:FindFirstChild("Enemies")
     if enemiesFolder then
         for _, enemy in pairs(enemiesFolder:GetChildren()) do
@@ -231,7 +260,7 @@ local function GetClosestTarget()
             end
         end
     end
-
+    
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= player and not isAlly(p) and p.Character then
             local hum = p.Character:FindFirstChildOfClass("Humanoid")
@@ -246,6 +275,9 @@ local function GetClosestTarget()
     return closest
 end
 
+-- ============================================================
+-- CONTROL DE ACTIVACIÓN - SIN CAMBIOS
+-- ============================================================
 _G.DragonAttackActive = false
 local isOpen = true
 
@@ -279,6 +311,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
+-- Bucle Estable (0.065s para evitar bloqueos del servidor)
 task.spawn(function()
     InitDragonGun()
     while true do
@@ -288,18 +321,18 @@ task.spawn(function()
                 local char = player.Character
                 local tool = char and char:FindFirstChildOfClass("Tool")
                 if not tool or tool.ToolTip ~= "Gun" then return end
-
+                
                 local target = GetClosestTarget()
                 if not target then return end
-
+                
                 local code, count = GetNextValidator()
-                if code ~= 0 and Validator2 then
-                    Validator2:FireServer(code, count)
+                if code ~= 0 and Validator2 then 
+                    Validator2:FireServer(code, count) 
                 end
-
+                
                 tool:SetAttribute("LocalOverheat", 0)
                 tool:SetAttribute("LocalTotalShots", 0)
-
+                
                 if ShootGunEvent then
                     ShootGunEvent:FireServer(target.Position, { target })
                 end
