@@ -5,15 +5,14 @@ local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
 
--- GUI (sin cambios)
 local guiName = "GA_Edsusito_PixelCatUI"
 local parentTarget = (gethui and gethui()) or CoreGui or player:WaitForChild("PlayerGui")
-if parentTarget:FindFirstChild(guiName) then
-    parentTarget[guiName]:Destroy()
+if parentTarget:FindFirstChild("GA_Edsusito_PixelCatUI") then
+    parentTarget["GA_Edsusito_PixelCatUI"]:Destroy()
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = guiName
+screenGui.Name = "GA_Edsusito_PixelCatUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentTarget
 
@@ -45,8 +44,8 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 
 local catCircleContainer = Instance.new("Frame", mainFrame)
 catCircleContainer.Name = "CatCircle"
-catCircleContainer.Size = UDim2.new(0, 38, 0, 38)
-catCircleContainer.Position = UDim2.new(1, -44, 0, 2)
+catCircleContainer.Size = UDim2.new(0, 32, 0, 32)
+catCircleContainer.Position = UDim2.new(1, -38, 0, 4)
 catCircleContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
 catCircleContainer.BorderSizePixel = 0
 
@@ -64,28 +63,26 @@ faceLabel.Size = UDim2.new(1, 0, 1, 0)
 faceLabel.Position = UDim2.new(0, 0, 0, 0)
 faceLabel.BackgroundTransparency = 1
 faceLabel.Font = Enum.Font.Code
-faceLabel.TextSize = 16
+faceLabel.TextSize = 14
 faceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 faceLabel.TextYAlignment = Enum.TextYAlignment.Center
 faceLabel.TextXAlignment = Enum.TextXAlignment.Center
 
 local faceExpressions = {
-    "(◕‿◕)",
-    "(◠‿◠)",
-    "(◕ᴗ◕)",
-    "(◠ᴗ◠)",
-    "(◕▿◕)",
-    "(◠▿◠)",
-    "(◕◡◕)",
-    "(◠◡◠)",
+    "•‿•",
+    "˘ω˘",
+    "^_^",
+    "・∀・",
+    "•ω•",
+    "T_T",
 }
 
 task.spawn(function()
     local idx = 1
     while mainFrame and mainFrame.Parent do
-        faceLabel.Text = faceExpressions[idx]
-        idx = (idx % #faceExpressions) + 1
-        task.wait(0.3)
+        faceLabel.Text = faceExpressions[1]
+        idx = (1 % #faceExpressions) + 1
+        task.wait(0.8)
     end
 end)
 
@@ -121,7 +118,6 @@ infoLabel.TextSize = 8
 infoLabel.TextColor3 = Color3.fromRGB(130, 130, 140)
 infoLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- Dragging (sin cambios)
 local dragging, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -144,7 +140,6 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Módulos del juego
 local DragonModules = ReplicatedStorage:WaitForChild("Modules", 5)
 local DragonNet = DragonModules and DragonModules:WaitForChild("Net", 5)
 local ShootGunEvent = DragonNet and DragonNet:WaitForChild("RE/ShootGunEvent", 5)
@@ -217,63 +212,38 @@ local function isAlly(targetPlayer)
     return false
 end
 
--- ============================================
--- NUEVA DETECCIÓN POR BARRA DE VIDA (BillboardGui)
--- ============================================
 local function GetClosestTarget()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
 
-    local closestPart, closestDist = nil, 3000
+    local closest, dist = nil, 3000
     local myPos = root.Position
 
-    for _, model in pairs(workspace:GetDescendants()) do
-        if model:IsA("Model") and model ~= char then
-            -- Verificar si tiene barra de vida (BillboardGui), Humanoid vivo, o HumanoidRootPart
-            local hasBillboard = model:FindFirstChildOfClass("BillboardGui") ~= nil
-            local hum = model:FindFirstChildOfClass("Humanoid")
-            local hasHealth = hum and hum.Health > 0
-            local hrp = model:FindFirstChild("HumanoidRootPart")
-
-            -- Elegir la parte a la que apuntar: HRP si existe, si no PrimaryPart, si no cualquier BasePart
-            local targetPart = hrp or model.PrimaryPart
-            if not targetPart then
-                -- Último recurso: buscar cualquier BasePart del modelo
-                for _, child in pairs(model:GetDescendants()) do
-                    if child:IsA("BasePart") then
-                        targetPart = child
-                        break
-                    end
-                end
-            end
-
-            if targetPart and (hasBillboard or hasHealth or hrp) then
-                local isPlayer = Players:GetPlayerFromCharacter(model)
-                local canAttack = false
-
-                if isPlayer then
-                    -- Jugador: verificar enemigo
-                    if isPlayer ~= player and not isAlly(isPlayer) and not isPlayer:GetAttribute("PvpDisabled") then
-                        canAttack = true
-                    end
-                else
-                    -- NPC / Bestia / Barco: atacar siempre que tenga barra, vida o HRP
-                    canAttack = true
-                end
-
-                if canAttack then
-                    local d = (targetPart.Position - myPos).Magnitude
-                    if d <= closestDist then
-                        closestDist = d
-                        closestPart = targetPart
-                    end
-                end
+    local enemiesFolder = workspace:FindFirstChild("Enemies")
+    if enemiesFolder then
+        for _, enemy in pairs(enemiesFolder:GetChildren()) do
+            local hum = enemy:FindFirstChildOfClass("Humanoid")
+            local r = enemy:FindFirstChild("HumanoidRootPart")
+            if hum and hum.Health > 0 and r then
+                local d = (r.Position - myPos).Magnitude
+                if d <= dist then dist = d; closest = r end
             end
         end
     end
 
-    return closestPart
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and not isAlly(p) and p.Character then
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            local r = p.Character:FindFirstChild("HumanoidRootPart")
+            local pvpDisabled = p:GetAttribute("PvpDisabled")
+            if hum and hum.Health > 0 and r and not pvpDisabled then
+                local d = (r.Position - myPos).Magnitude
+                if d <= dist then dist = d; closest = r end
+            end
+        end
+    end
+    return closest
 end
 
 _G.DragonAttackActive = false
@@ -317,7 +287,7 @@ task.spawn(function()
             pcall(function()
                 local char = player.Character
                 local tool = char and char:FindFirstChildOfClass("Tool")
-                if not tool then return end
+                if not tool or tool.ToolTip ~= "Gun" then return end
 
                 local target = GetClosestTarget()
                 if not target then return end
@@ -338,4 +308,4 @@ task.spawn(function()
     end
 end)
 
-print("GA Edsusito v3.0 – Ataca todo lo que tenga barra de vida.")
+print("GA Edsusito (Animated Face) Cargado con Éxito.")
