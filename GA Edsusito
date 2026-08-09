@@ -2,11 +2,10 @@ local Players = game.Players
 local ReplicatedStorage = game.ReplicatedStorage
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
-local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
--- GUI (idéntica a la que tenías)
+-- GUI (sin cambios)
 local guiName = "GA_Edsusito_PixelCatUI"
 local parentTarget = (gethui and gethui()) or CoreGui or player:WaitForChild("PlayerGui")
 if parentTarget:FindFirstChild(guiName) then
@@ -71,8 +70,14 @@ faceLabel.TextYAlignment = Enum.TextYAlignment.Center
 faceLabel.TextXAlignment = Enum.TextXAlignment.Center
 
 local faceExpressions = {
-    "(◕‿◕)", "(◠‿◠)", "(◕ᴗ◕)", "(◠ᴗ◠)",
-    "(◕▿◕)", "(◠▿◠)", "(◕◡◕)", "(◠◡◠)",
+    "(◕‿◕)",
+    "(◠‿◠)",
+    "(◕ᴗ◕)",
+    "(◠ᴗ◠)",
+    "(◕▿◕)",
+    "(◠▿◠)",
+    "(◕◡◕)",
+    "(◠◡◠)",
 }
 
 task.spawn(function()
@@ -116,6 +121,7 @@ infoLabel.TextSize = 8
 infoLabel.TextColor3 = Color3.fromRGB(130, 130, 140)
 infoLabel.TextXAlignment = Enum.TextXAlignment.Left
 
+-- Dragging (sin cambios)
 local dragging, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -138,59 +144,30 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- ============================================
--- Inicialización mejorada del Combate
--- ============================================
-local ShootFunction, V_Idx
+-- Módulos del juego
+local DragonModules = ReplicatedStorage:WaitForChild("Modules", 5)
+local DragonNet = DragonModules and DragonModules:WaitForChild("Net", 5)
+local ShootGunEvent = DragonNet and DragonNet:WaitForChild("RE/ShootGunEvent", 5)
 local Validator2 = ReplicatedStorage:WaitForChild("Remotes", 5):WaitForChild("Validator2", 5)
-local ShootGunEvent
+
+local getupval = debug.getupvalue or getupvalue
+local setupval = debug.setupvalue or setupvalue
+local getupvals = debug.getupvalues or getupvalues
+
+local ShootFunction
+local V_Idx = { v26 = 12, v22 = 13, v25 = 14, v21 = 15, v23 = 16, v24 = 17, v27 = 18 }
 
 local function InitDragonGun()
-    local success, combat = pcall(require, ReplicatedStorage:WaitForChild("Controllers"):WaitForChild("CombatController"))
-    if not success or not combat or not combat.Attack then
-        warn("No se pudo cargar CombatController. Intentando método alternativo...")
-        -- Intenta con el módulo Net
-        local netSuccess, net = pcall(require, ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net"))
-        if netSuccess and net then
-            local gunRemote = net:WaitForChild("RE/ShootGunEvent", 5)
-            if gunRemote then
-                ShootGunEvent = gunRemote
-                warn("Usando ShootGunEvent directo desde Net")
-                return true
-            end
-        end
-        return false
+    local success, result = pcall(require, ReplicatedStorage:WaitForChild("Controllers"):WaitForChild("CombatController"))
+    if success and type(result) == "table" and result.Attack then
+        ShootFunction = getupval(result.Attack, 9)
     end
-
-    ShootGunEvent = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net"):WaitForChild("RE/ShootGunEvent", 5)
-    
-    -- Obtener la función Attack del CombatController
-    local attackFunc = combat.Attack
-    -- Intentar varios índices de upvalue (a veces cambia)
-    for idx = 8, 12 do
-        local upval = debug.getupvalue(attackFunc, idx)
-        if upval and type(upval) == "function" then
-            -- Verificar si esta es la función que dispara
-            local upvals = debug.getupvalues(upval)
-            if upvals and #upvals >= 18 then
-                ShootFunction = upval
-                V_Idx = { v26 = 12, v22 = 13, v25 = 14, v21 = 15, v23 = 16, v24 = 17, v27 = 18 }
-                warn("CombatController inicializado correctamente.")
-                return true
-            end
-        end
-    end
-    warn("No se encontró la función de disparo en CombatController.")
-    return false
 end
 
 local function GetNextValidator()
-    if not ShootFunction then
-        if not InitDragonGun() then
-            return 0, 0
-        end
-    end
-    local upvals = debug.getupvalues(ShootFunction)
+    if not ShootFunction then InitDragonGun() end
+    if not ShootFunction then return 0, 0 end
+    local upvals = getupvals(ShootFunction)
     if not upvals then return 0, 0 end
     if upvals[V_Idx.v21] ~= 727595 then
         for i, v in pairs(upvals) do
@@ -203,13 +180,13 @@ local function GetNextValidator()
             end
         end
     end
-    local v1 = debug.getupvalue(ShootFunction, V_Idx.v21)
-    local v2 = debug.getupvalue(ShootFunction, V_Idx.v22)
-    local v3 = debug.getupvalue(ShootFunction, V_Idx.v23)
-    local v4 = debug.getupvalue(ShootFunction, V_Idx.v24)
-    local v5 = debug.getupvalue(ShootFunction, V_Idx.v25)
-    local v6 = debug.getupvalue(ShootFunction, V_Idx.v26)
-    local v7 = debug.getupvalue(ShootFunction, V_Idx.v27)
+    local v1 = getupval(ShootFunction, V_Idx.v21)
+    local v2 = getupval(ShootFunction, V_Idx.v22)
+    local v3 = getupval(ShootFunction, V_Idx.v23)
+    local v4 = getupval(ShootFunction, V_Idx.v24)
+    local v5 = getupval(ShootFunction, V_Idx.v25)
+    local v6 = getupval(ShootFunction, V_Idx.v26)
+    local v7 = getupval(ShootFunction, V_Idx.v27)
     if not (v1 and v2 and v3 and v4 and v5 and v6 and v7) then return 0, 0 end
     local v8 = v6 * v2
     local v9 = (v5 * v2 + v6 * v1) % v3
@@ -217,9 +194,9 @@ local function GetNextValidator()
     v5 = math.floor(v9 / v3)
     v6 = v9 - v5 * v3
     v7 = v8
-    debug.setupvalue(ShootFunction, V_Idx.v25, v5)
-    debug.setupvalue(ShootFunction, V_Idx.v26, v6)
-    debug.setupvalue(ShootFunction, V_Idx.v27, v7)
+    setupval(ShootFunction, V_Idx.v25, v5)
+    setupval(ShootFunction, V_Idx.v26, v6)
+    setupval(ShootFunction, V_Idx.v27, v7)
     return math.floor(v9 / 67108860), v7
 end
 
@@ -230,30 +207,18 @@ local function isAlly(targetPlayer)
     end
     pcall(function()
         local mainGui = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("Main")
-        if mainGui then
-            local alliesFrame = mainGui:FindFirstChild("Allies")
-            if alliesFrame then
-                local container = alliesFrame:FindFirstChild("Container")
-                if container then
-                    local allies = container:FindFirstChild("Allies")
-                    if allies then
-                        local sf = allies:FindFirstChild("ScrollingFrame")
-                        if sf then
-                            local frame = sf:FindFirstChild("Frame")
-                            if frame and frame:FindFirstChild(targetPlayer.Name) then
-                                return true
-                            end
-                        end
-                    end
-                end
-            end
-        end
+        local alliesFrame = mainGui and mainGui:FindFirstChild("Allies")
+            and mainGui.Allies:FindFirstChild("Container")
+            and mainGui.Allies.Container:FindFirstChild("Allies")
+            and mainGui.Allies.Container.Allies:FindFirstChild("ScrollingFrame")
+            and mainGui.Allies.Container.Allies:FindFirstChild("Frame")
+        if alliesFrame and alliesFrame:FindFirstChild(targetPlayer.Name) then return true end
     end)
     return false
 end
 
 -- ============================================
--- Búsqueda del objetivo más cercano (amplia)
+-- NUEVA DETECCIÓN POR BARRA DE VIDA (BillboardGui)
 -- ============================================
 local function GetClosestTarget()
     local char = player.Character
@@ -263,56 +228,54 @@ local function GetClosestTarget()
     local closestPart, closestDist = nil, 3000
     local myPos = root.Position
 
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj ~= char then
-            local targetPart = nil
-            local humanoid = obj:FindFirstChildOfClass("Humanoid")
-            
-            -- Prioridad 1: Humanoid con vida > 0
-            if humanoid and humanoid.Health > 0 then
-                targetPart = obj:FindFirstChild("HumanoidRootPart")
-            end
-            
-            -- Prioridad 2: Aunque no tenga Humanoid, si tiene HumanoidRootPart (raro)
+    for _, model in pairs(workspace:GetDescendants()) do
+        if model:IsA("Model") and model ~= char then
+            -- Verificar si tiene barra de vida (BillboardGui), Humanoid vivo, o HumanoidRootPart
+            local hasBillboard = model:FindFirstChildOfClass("BillboardGui") ~= nil
+            local hum = model:FindFirstChildOfClass("Humanoid")
+            local hasHealth = hum and hum.Health > 0
+            local hrp = model:FindFirstChild("HumanoidRootPart")
+
+            -- Elegir la parte a la que apuntar: HRP si existe, si no PrimaryPart, si no cualquier BasePart
+            local targetPart = hrp or model.PrimaryPart
             if not targetPart then
-                targetPart = obj:FindFirstChild("HumanoidRootPart")
+                -- Último recurso: buscar cualquier BasePart del modelo
+                for _, child in pairs(model:GetDescendants()) do
+                    if child:IsA("BasePart") then
+                        targetPart = child
+                        break
+                    end
+                end
             end
-            
-            -- Prioridad 3: Si es un modelo sin HumanoidRootPart, usar cualquier BasePart principal
-            if not targetPart then
-                targetPart = obj.PrimaryPart
-            end
-            
-            if targetPart then
-                local isPlayer = Players:GetPlayerFromCharacter(obj)
+
+            if targetPart and (hasBillboard or hasHealth or hrp) then
+                local isPlayer = Players:GetPlayerFromCharacter(model)
                 local canAttack = false
-                
+
                 if isPlayer then
+                    -- Jugador: verificar enemigo
                     if isPlayer ~= player and not isAlly(isPlayer) and not isPlayer:GetAttribute("PvpDisabled") then
                         canAttack = true
                     end
                 else
-                    -- NPC, marino, boss, barco, Sea Beast...
+                    -- NPC / Bestia / Barco: atacar siempre que tenga barra, vida o HRP
                     canAttack = true
                 end
-                
+
                 if canAttack then
-                    local dist = (targetPart.Position - myPos).Magnitude
-                    if dist <= closestDist then
-                        closestDist = dist
+                    local d = (targetPart.Position - myPos).Magnitude
+                    if d <= closestDist then
+                        closestDist = d
                         closestPart = targetPart
                     end
                 end
             end
         end
     end
-    
+
     return closestPart
 end
 
--- ============================================
--- Activar/Desactivar
--- ============================================
 _G.DragonAttackActive = false
 local isOpen = true
 
@@ -346,11 +309,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- ============================================
--- Bucle de disparo
--- ============================================
 task.spawn(function()
-    InitDragonGun()  -- primer intento
+    InitDragonGun()
     while true do
         task.wait(0.065)
         if _G.DragonAttackActive then
@@ -372,13 +332,10 @@ task.spawn(function()
 
                 if ShootGunEvent then
                     ShootGunEvent:FireServer(target.Position, { target })
-                else
-                    warn("ShootGunEvent no encontrado. Reintentando inicialización...")
-                    InitDragonGun()
                 end
             end)
         end
     end
 end)
 
-print("GA Edsusito v2.0 - Ataque universal activo.")
+print("GA Edsusito v3.0 – Ataca todo lo que tenga barra de vida.")
