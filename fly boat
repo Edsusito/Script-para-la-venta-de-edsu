@@ -1,5 +1,5 @@
 -- ==========================================
--- 🛥️ EDSUSITO BOAT FLY V5 (Estable + 5 Bailes + GUI Clásica)
+-- 🛥️ EDSUSITO BOAT FLY V5 (Panel Oscuro Puro)
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -32,11 +32,11 @@ trackerGui.StudsOffset = Vector3.new(0, 8, 0)
 local trackerText = Instance.new("TextLabel")
 trackerText.Size = UDim2.new(1, 0, 1, 0)
 trackerText.BackgroundTransparency = 1
-trackerText.TextColor3 = Color3.fromRGB(0, 255, 255) 
-trackerText.TextStrokeTransparency = 0
+trackerText.TextColor3 = Color3.fromRGB(255, 255, 255) 
+trackerText.TextStrokeTransparency = 0.5
 trackerText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 trackerText.TextScaled = true
-trackerText.Font = Enum.Font.SourceSansBold
+trackerText.Font = Enum.Font.GothamBlack
 trackerText.Parent = trackerGui
 
 local function monitorSeating(character)
@@ -87,7 +87,7 @@ local function GetBestBoatSeat()
 end
 
 -- ==========================================
--- 2. GUI CLÁSICA (Sin Fling, Espacios Reajustados)
+-- 2. GUI CON ESTÉTICA OSCURA PURA
 -- ==========================================
 if CoreGui:FindFirstChild("BoatFlyGUI") then CoreGui.BoatFlyGUI:Destroy() end
 
@@ -95,57 +95,85 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BoatFlyGUI"
 ScreenGui.Parent = CoreGui 
 
+-- Contenedor Principal (Negro absoluto)
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 200, 0, 380) 
 MainFrame.Position = UDim2.new(0.8, 0, 0.3, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 MainFrame.Active = true
 MainFrame.Draggable = true 
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
 
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(255, 255, 255)
+MainStroke.Transparency = 0.9 -- Borde super sutil
+MainStroke.Parent = MainFrame
+
+-- Barra de Título
 local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 30)
-TitleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TitleBar.Size = UDim2.new(1, 0, 0, 35)
+TitleBar.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 TitleBar.BorderSizePixel = 0
 TitleBar.Parent = MainFrame
 
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = TitleBar
+
+-- Corrección para esquinas inferiores rectas en la barra de título
+local TitleFix = Instance.new("Frame")
+TitleFix.Size = UDim2.new(1, 0, 0, 5)
+TitleFix.Position = UDim2.new(0, 0, 1, -5)
+TitleFix.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+TitleFix.BorderSizePixel = 0
+TitleFix.Parent = TitleBar
+
+local TitleLine = Instance.new("Frame")
+TitleLine.Size = UDim2.new(1, 0, 0, 1)
+TitleLine.Position = UDim2.new(0, 0, 1, 0)
+TitleLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+TitleLine.BackgroundTransparency = 0.92
+TitleLine.Parent = TitleBar
+
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -60, 1, 0)
-Title.Position = UDim2.new(0, 5, 0, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Text = "🛥️ Boat Fly Panel"
-Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 16
+Title.TextColor3 = Color3.fromRGB(255, 255, 255) -- Tu nombre en BLANCO PURO
+Title.Text = "EDSUSITO BOAT FLY"
+Title.Font = Enum.Font.GothamBlack
+Title.TextSize = 13
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TitleBar
 
 local MinimizeBtn = Instance.new("TextButton")
 MinimizeBtn.Size = UDim2.new(0, 30, 1, 0)
 MinimizeBtn.Position = UDim2.new(1, -60, 0, 0)
-MinimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.BackgroundTransparency = 1
+MinimizeBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
 MinimizeBtn.Text = "-"
-MinimizeBtn.Font = Enum.Font.SourceSansBold
+MinimizeBtn.Font = Enum.Font.GothamBold
 MinimizeBtn.TextSize = 20
-MinimizeBtn.BorderSizePixel = 0
 MinimizeBtn.Parent = TitleBar
 
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 30, 1, 0)
 CloseBtn.Position = UDim2.new(1, -30, 0, 0)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
 CloseBtn.Text = "X"
-CloseBtn.Font = Enum.Font.SourceSansBold
-CloseBtn.TextSize = 16
-CloseBtn.BorderSizePixel = 0
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 14
 CloseBtn.Parent = TitleBar
 
 local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1, 0, 1, -30)
-Content.Position = UDim2.new(0, 0, 0, 30)
+Content.Size = UDim2.new(1, 0, 1, -35)
+Content.Position = UDim2.new(0, 0, 0, 35)
 Content.BackgroundTransparency = 1
 Content.Parent = MainFrame
 
@@ -154,58 +182,83 @@ local function CreateButton(text, pos, color)
     btn.Size = UDim2.new(0.9, 0, 0, 30)
     btn.Position = pos
     btn.BackgroundColor3 = color
-    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextColor3 = Color3.fromRGB(220, 220, 220)
     btn.Text = text
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 15
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 12
     btn.BorderSizePixel = 0
     btn.Parent = Content
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = btn
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Transparency = 0.95
+    stroke.Parent = btn
+    
     return btn
 end
 
--- Reajuste de posiciones (Y) tras eliminar el botón del Modo Diablo
-local FindBtn = CreateButton("🔍 BUSCAR MI BARCO", UDim2.new(0.05, 0, 0, 10), Color3.fromRGB(200, 150, 20))
-local ToggleBtn = CreateButton("VUELO MANUAL: OFF", UDim2.new(0.05, 0, 0, 45), Color3.fromRGB(200, 50, 50))
-local AutoBtn = CreateButton("AUTO AVANCE: OFF", UDim2.new(0.05, 0, 0, 80), Color3.fromRGB(50, 100, 200))
+-- Colores oscuros puros
+local FindBtn = CreateButton("🔍 BUSCAR MI BARCO", UDim2.new(0.05, 0, 0, 10), Color3.fromRGB(30, 20, 0))
+local ToggleBtn = CreateButton("VUELO MANUAL: OFF", UDim2.new(0.05, 0, 0, 45), Color3.fromRGB(30, 0, 0))
+local AutoBtn = CreateButton("AUTO AVANCE: OFF", UDim2.new(0.05, 0, 0, 80), Color3.fromRGB(0, 10, 30))
 
-local SpeedInput = Instance.new("TextBox")
-SpeedInput.Size = UDim2.new(0.9, 0, 0, 25)
-SpeedInput.Position = UDim2.new(0.05, 0, 0, 115)
-SpeedInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-SpeedInput.TextColor3 = Color3.new(1, 1, 1)
-SpeedInput.Text = tostring(defaultSpeed)
+local function CreateInput(text, pos)
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0.9, 0, 0, 25)
+    box.Position = pos
+    box.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    box.TextColor3 = Color3.fromRGB(200, 200, 200)
+    box.Text = text
+    box.Font = Enum.Font.GothamSemibold
+    box.TextSize = 12
+    box.BorderSizePixel = 0
+    box.Parent = Content
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = box
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Transparency = 0.95
+    stroke.Parent = box
+    
+    return box
+end
+
+local SpeedInput = CreateInput(tostring(defaultSpeed), UDim2.new(0.05, 0, 0, 115))
 SpeedInput.PlaceholderText = "Velocidad"
-SpeedInput.BorderSizePixel = 0
-SpeedInput.Parent = Content
 
-local HeightInput = Instance.new("TextBox")
-HeightInput.Size = UDim2.new(0.9, 0, 0, 25)
-HeightInput.Position = UDim2.new(0.05, 0, 0, 145)
-HeightInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-HeightInput.TextColor3 = Color3.new(1, 1, 1)
-HeightInput.Text = tostring(targetHeight)
+local HeightInput = CreateInput(tostring(targetHeight), UDim2.new(0.05, 0, 0, 145))
 HeightInput.PlaceholderText = "Altura Y"
-HeightInput.BorderSizePixel = 0
-HeightInput.Parent = Content
 
-local DanceBtn = CreateButton("🐄 MODO BAILE: OFF", UDim2.new(0.05, 0, 0, 180), Color3.fromRGB(150, 50, 200))
-local DropdownBtn = CreateButton("Baile: Vaca Polaca ▼", UDim2.new(0.05, 0, 0, 215), Color3.fromRGB(40, 40, 40))
-DropdownBtn.TextSize = 14
+local DanceBtn = CreateButton("🐄 MODO BAILE: OFF", UDim2.new(0.05, 0, 0, 180), Color3.fromRGB(20, 0, 30))
+local DropdownBtn = CreateButton("Baile: Vaca Polaca ▼", UDim2.new(0.05, 0, 0, 215), Color3.fromRGB(15, 15, 15))
 
 local DropdownList = Instance.new("Frame")
 DropdownList.Size = UDim2.new(0.9, 0, 0, 125)
 DropdownList.Position = UDim2.new(0.05, 0, 0, 245)
-DropdownList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+DropdownList.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
 DropdownList.Visible = false
 DropdownList.ZIndex = 5
-DropdownList.BorderSizePixel = 1
-DropdownList.BorderColor3 = Color3.fromRGB(0, 0, 0)
 DropdownList.Parent = Content
+
+local DropCorner = Instance.new("UICorner")
+DropCorner.CornerRadius = UDim.new(0, 4)
+DropCorner.Parent = DropdownList
+
+local DropStroke = Instance.new("UIStroke")
+DropStroke.Color = Color3.fromRGB(255, 255, 255)
+DropStroke.Transparency = 0.9
+DropStroke.Parent = DropdownList
 
 local UIListLayout = Instance.new("UIListLayout", DropdownList)
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Solo los 5 bailes estables solicitados
 local bailes = {
     {"🐄 Vaca Polaca", "Vaca"},
     {"🥴 Borracho", "Borracho"},
@@ -217,12 +270,12 @@ local bailes = {
 for i, baileInfo in ipairs(bailes) do
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 25)
-    btn.BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(40, 40, 40) or Color3.fromRGB(50, 50, 50)
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(10, 10, 10) or Color3.fromRGB(15, 15, 15)
+    btn.TextColor3 = Color3.fromRGB(180, 180, 180)
     btn.Text = "  " .. baileInfo[1]
     btn.TextXAlignment = Enum.TextXAlignment.Left
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 14
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 12
     btn.ZIndex = 6
     btn.BorderSizePixel = 0
     btn.Parent = DropdownList
@@ -241,7 +294,7 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     Content.Visible = not isMinimized
     MinimizeBtn.Text = isMinimized and "+" or "-"
-    MainFrame.Size = isMinimized and UDim2.new(0, 200, 0, 30) or UDim2.new(0, 200, 0, 380)
+    MainFrame.Size = isMinimized and UDim2.new(0, 200, 0, 35) or UDim2.new(0, 200, 0, 380)
 end)
 
 -- ==========================================
@@ -253,11 +306,11 @@ local function stopFlying()
     isDancing = false
     
     ToggleBtn.Text = "VUELO MANUAL: OFF"
-    ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
     AutoBtn.Text = "AUTO AVANCE: OFF"
-    AutoBtn.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
+    AutoBtn.BackgroundColor3 = Color3.fromRGB(0, 10, 30)
     DanceBtn.Text = "🐄 MODO BAILE: OFF"
-    DanceBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 200)
+    DanceBtn.BackgroundColor3 = Color3.fromRGB(20, 0, 30)
     
     if renderConnection then renderConnection:Disconnect() renderConnection = nil end
     if lv then lv:Destroy() lv = nil end
@@ -283,7 +336,7 @@ local function TweenToBoat(callback)
         isTweening = false
         hrp.Anchored = false 
         FindBtn.Text = "🔍 BUSCAR MI BARCO"
-        FindBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 20)
+        FindBtn.BackgroundColor3 = Color3.fromRGB(30, 20, 0)
         return
     end
     
@@ -297,7 +350,7 @@ local function TweenToBoat(callback)
     
     isTweening = true
     FindBtn.Text = "🛑 CANCELAR VIAJE"
-    FindBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    FindBtn.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
     
     local dist = (bestSeat.Position - hrp.Position).Magnitude
     local tweenTime = dist / 250
@@ -321,7 +374,7 @@ local function TweenToBoat(callback)
             
             task.wait(0.2)
             FindBtn.Text = "🔍 BUSCAR MI BARCO"
-            FindBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 20)
+            FindBtn.BackgroundColor3 = Color3.fromRGB(30, 20, 0)
             if callback then callback() end
         end
     end)
@@ -365,13 +418,13 @@ local function startFlying(mode)
     
     if isAuto then
         AutoBtn.Text = "AUTO AVANCE: ON"
-        AutoBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        AutoBtn.BackgroundColor3 = Color3.fromRGB(0, 30, 10)
     elseif isDancing then
         DanceBtn.Text = "🐄 MODO BAILE: ON"
-        DanceBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 200)
+        DanceBtn.BackgroundColor3 = Color3.fromRGB(40, 10, 30)
     else
         ToggleBtn.Text = "VUELO MANUAL: ON"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 30, 10)
     end
     
     renderConnection = RunService.Heartbeat:Connect(function()
@@ -385,7 +438,6 @@ local function startFlying(mode)
         local currentTargetHeight = tonumber(HeightInput.Text) or targetHeight
         local cam = workspace.CurrentCamera
         
-        -- Orientación base alineada con la cámara
         local lookVec = cam.CFrame.LookVector
         local forwardDir = Vector3.new(lookVec.X, 0, lookVec.Z).Unit
         local baseCFrame = CFrame.lookAt(Vector3.zero, forwardDir)
