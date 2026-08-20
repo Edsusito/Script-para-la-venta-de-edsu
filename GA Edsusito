@@ -1,7 +1,7 @@
 -- ============================================================
 -- EDSUSITO GUN AURA - MINI GUI RETRO (Solo Dragon Gun M1)
 -- Diseño limpio blanco / gris / negro
--- No ataca a aliados (mismo equipo) automáticamente
+-- Ataca al objetivo más cercano (mobs o jugadores según toggles)
 -- Delay de disparo: 0.016 (60 fps)
 -- ============================================================
 
@@ -38,7 +38,6 @@ local COLOR_BORDER = Color3.fromRGB(255, 255, 255)   -- bordes blancos
 _G.G_DragonGunM1 = false
 _G.G_AttackMobs = true
 _G.G_AttackPlayers = true
-_G.G_AllyCheck = true  -- Activar comprobación de aliados automática
 
 -- ============================================================
 -- DRAGON GUN M1 (Optimizado)
@@ -102,19 +101,6 @@ function GetNextValidator()
     return math.floor(v9 / v4 * 16777215), v7
 end
 
--- Función para detectar aliados automáticamente (mismo equipo)
-local function IsAlly(targetPlayer)
-    if not _G.G_AllyCheck then return false end
-    if not targetPlayer or targetPlayer == player then return true end
-
-    -- Si ambos tienen team y son iguales, es aliado
-    if player.Team and targetPlayer.Team and player.Team == targetPlayer.Team then
-        return true
-    end
-
-    return false
-end
-
 function GetClosestDragonTarget()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -140,10 +126,10 @@ function GetClosestDragonTarget()
         end
     end
 
-    -- Atacar jugadores (excepto aliados)
+    -- Atacar jugadores (todos, sin filtro de aliados)
     if _G.G_AttackPlayers then
         for _, p in pairs(Players:GetPlayers()) do
-            if p ~= player and not IsAlly(p) and p.Character then
+            if p ~= player and p.Character then
                 local hum = p.Character:FindFirstChildOfClass("Humanoid")
                 local r = p.Character:FindFirstChild("HumanoidRootPart")
                 if hum and hum.Health > 0 and r then
