@@ -1,13 +1,15 @@
 -- ============================================================
--- EDSUSITO HUB - ULTIMATE SCRIPT
--- Diseño Black & White, todas las funciones integradas
+-- EDSUSITO GUN AURA - MINI GUI RETRO (Solo Dragon Gun M1)
+-- Diseño limpio blanco / gris / negro
+-- No ataca a aliados (mismo equipo) automáticamente
+-- Delay de disparo: 0.016 (60 fps)
 -- ============================================================
 
 -- Servicios
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local HttpService = game:GetService("HttpService")
@@ -19,28 +21,36 @@ local camera = workspace.CurrentCamera
 local mouse = player:GetMouse()
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Colores base del tema
-local COLOR_BG = Color3.fromRGB(0, 0, 0)          -- Negro puro
-local COLOR_PANEL = Color3.fromRGB(20, 20, 20)    -- Gris muy oscuro para tarjetas
-local COLOR_WHITE = Color3.fromRGB(255, 255, 255) -- Blanco
-local COLOR_ACCENT = Color3.fromRGB(255, 255, 255)-- Acento blanco
-local COLOR_TOGGLE_ON = Color3.fromRGB(255, 255, 255) -- Toggle ON fondo blanco
-local COLOR_TOGGLE_OFF = Color3.fromRGB(50, 50, 50)   -- Toggle OFF gris oscuro
-local COLOR_TEXT_ON = Color3.fromRGB(0, 0, 0)     -- Texto negro sobre toggle blanco
-local COLOR_TEXT_OFF = Color3.fromRGB(255, 255, 255)  -- Texto blanco sobre toggle oscuro
-local COLOR_BORDER = Color3.fromRGB(255, 255, 255) -- Bordes blancos
+-- Colores retro
+local COLOR_BG = Color3.fromRGB(0, 0, 0)             -- negro puro
+local COLOR_PANEL = Color3.fromRGB(25, 25, 25)       -- gris muy oscuro
+local COLOR_WHITE = Color3.fromRGB(255, 255, 255)    -- blanco
+local COLOR_GRAY = Color3.fromRGB(120, 120, 120)     -- gris medio
+local COLOR_TOGGLE_ON = Color3.fromRGB(255, 255, 255)-- toggle encendido (blanco)
+local COLOR_TOGGLE_OFF = Color3.fromRGB(45, 45, 45)  -- toggle apagado (gris oscuro)
+local COLOR_TEXT_ON = Color3.fromRGB(0, 0, 0)        -- texto negro sobre toggle blanco
+local COLOR_TEXT_OFF = Color3.fromRGB(255, 255, 255) -- texto blanco sobre toggle oscuro
+local COLOR_BORDER = Color3.fromRGB(255, 255, 255)   -- bordes blancos
 
 -- ============================================================
--- DRAGON GUN M1 (Optimizado desde GA Edsusito)
+-- VARIABLES GLOBALES DE CONFIGURACIÓN
+-- ============================================================
+_G.G_DragonGunM1 = false
+_G.G_AttackMobs = true
+_G.G_AttackPlayers = true
+_G.G_AllyCheck = true  -- Activar comprobación de aliados automática
+
+-- ============================================================
+-- DRAGON GUN M1 (Optimizado)
 -- ============================================================
 local DragonModules = ReplicatedStorage:WaitForChild("Modules")
 local DragonNet = DragonModules:WaitForChild("Net")
 local ShootGunEvent = DragonNet:WaitForChild("RE/ShootGunEvent")
 local Validator2 = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Validator2")
 
-local getupval = debug.getupvalue or getupvalue
-local setupval = debug.setupvalue or setupvalue
-local getupvals = debug.getupvalues or getupvalues
+local getupval = debug.getupvalue
+local setupval = debug.setupvalue
+local getupvals = debug.getupvalues
 
 local ShootFunction
 local V_Idx = { v26 = 12, v22 = 13, v25 = 14, v21 = 15, v23 = 16, v24 = 17, v27 = 18 }
@@ -61,8 +71,12 @@ function GetNextValidator()
         for i, v in pairs(upvals) do
             if v == 727595 then
                 local offset = i - 15
-                V_Idx.v21 = i; V_Idx.v22 = 13 + offset; V_Idx.v23 = 16 + offset
-                V_Idx.v24 = 17 + offset; V_Idx.v26 = 12 + offset; V_Idx.v25 = 14 + offset
+                V_Idx.v21 = i
+                V_Idx.v22 = 13 + offset
+                V_Idx.v23 = 16 + offset
+                V_Idx.v24 = 17 + offset
+                V_Idx.v26 = 12 + offset
+                V_Idx.v25 = 14 + offset
                 V_Idx.v27 = 18 + offset
                 break
             end
@@ -88,6 +102,19 @@ function GetNextValidator()
     return math.floor(v9 / v4 * 16777215), v7
 end
 
+-- Función para detectar aliados automáticamente (mismo equipo)
+local function IsAlly(targetPlayer)
+    if not _G.G_AllyCheck then return false end
+    if not targetPlayer or targetPlayer == player then return true end
+
+    -- Si ambos tienen team y son iguales, es aliado
+    if player.Team and targetPlayer.Team and player.Team == targetPlayer.Team then
+        return true
+    end
+
+    return false
+end
+
 function GetClosestDragonTarget()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -95,6 +122,7 @@ function GetClosestDragonTarget()
     local closest, dist = nil, math.huge
     local myPos = root.Position
 
+    -- Atacar mobs
     if _G.G_AttackMobs then
         local enemies = workspace:FindFirstChild("Enemies")
         if enemies then
@@ -103,40 +131,53 @@ function GetClosestDragonTarget()
                 local r = enemy:FindFirstChild("HumanoidRootPart")
                 if hum and hum.Health > 0 and r then
                     local d = (r.Position - myPos).Magnitude
-                    if d < dist then dist = d; closest = r end
+                    if d < dist then
+                        dist = d
+                        closest = r
+                    end
                 end
             end
         end
     end
 
+    -- Atacar jugadores (excepto aliados)
     if _G.G_AttackPlayers then
         for _, p in pairs(Players:GetPlayers()) do
-            if p ~= player and p.Character then
+            if p ~= player and not IsAlly(p) and p.Character then
                 local hum = p.Character:FindFirstChildOfClass("Humanoid")
                 local r = p.Character:FindFirstChild("HumanoidRootPart")
                 if hum and hum.Health > 0 and r then
                     local d = (r.Position - myPos).Magnitude
-                    if d < dist then dist = d; closest = r end
+                    if d < dist then
+                        dist = d
+                        closest = r
+                    end
                 end
             end
         end
     end
+
     return closest
 end
 
--- Bucle Dragon M1 (ya arreglado y sin lag)
+-- Bucle Dragon M1 (delay 0.016)
 task.spawn(function()
     while true do
-        task.wait(0.065)  -- Intervalo optimizado
+        task.wait(0.016)  -- 60 disparos por segundo
         if _G.G_DragonGunM1 then
             pcall(function()
                 local char = player.Character
                 local tool = char and char:FindFirstChildOfClass("Tool")
                 if not tool or tool.ToolTip ~= "Gun" then return end
+
                 local target = GetClosestDragonTarget()
                 if not target then return end
+
                 local code, count = GetNextValidator()
-                if code ~= 0 then Validator2:FireServer(code, count) end
+                if code ~= 0 then
+                    Validator2:FireServer(code, count)
+                end
+
                 tool:SetAttribute("LocalOverheat", 0)
                 tool:SetAttribute("LocalTotalShots", (tool:GetAttribute("LocalTotalShots") or 0) + 1)
                 ShootGunEvent:FireServer(target.Position, { target })
@@ -146,247 +187,117 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- VARIABLES GLOBALES DE CONFIGURACIÓN
--- ============================================================
-_G.G_DragonGunM1 = false
-_G.G_AttackMobs = true
-_G.G_AttackPlayers = true
-_G.G_SilentAimSkill = false
-_G.G_SilentAimShowFOV = false
-_G.G_SilentAimFOV = 150
-_G.G_SilentAimPart = "Head"
-_G.G_SilentAimFOVThickness = 2
-_G.G_SilentAimFOVTransparency = 1
-_G.G_SilentAimTargetPlayers = false
-_G.G_SilentAimTargetMobs = false
-_G.G_SilentAimShowLine = false
-_G.G_SilentAimFOVMode = "Screen Center"
-_G.G_SilentAimTeamCheck = false
-_G.G_SilentAimSelectedPlayer = ""
-_G.G_ESPEnabled = false
-_G.G_ESP_Name = true
-_G.G_ESP_Level = true
-_G.G_ESP_Bounty = true
-_G.G_ESP_Fruit = true
-_G.G_ESP_Distance = true
-_G.G_ESP_HP = true
-_G.G_ESP_TextSize = 12
-_G.G_ESP_Highlight = false
-_G.G_ESP_HighlightColor = "FFFFFF"
-
--- ============================================================
--- SISTEMA DE UI EDSUSITO HUB
+-- MINI GUI RETRO (3 botones)
 -- ============================================================
 -- Eliminar interfaces antiguas
 for _, gui in pairs(playerGui:GetChildren()) do
-    if gui.Name:match("EdsusitoHub") then gui:Destroy() end
+    if gui.Name:match("EdsusitoGunAura") then
+        gui:Destroy()
+    end
 end
-
--- Imagen de fondo (placeholder negro, cambia el ID cuando tengas la imagen)
-local BACKGROUND_IMAGE_ID = "" -- Deja vacío o pon un ID de decal negro
 
 -- Crear ScreenGui principal
 local hubGui = Instance.new("ScreenGui")
-hubGui.Name = "EdsusitoHub"
+hubGui.Name = "EdsusitoGunAura"
 hubGui.ResetOnSpawn = false
 hubGui.IgnoreGuiInset = true
 hubGui.Parent = playerGui
 
--- --- CÍRCULO NEGRO PARA ABRIR/CERRAR (móvil y PC) ---
+-- Pequeño círculo para reabrir el panel
 local circleBtn = Instance.new("TextButton")
-circleBtn.Size = UDim2.new(0, 50, 0, 50)
-circleBtn.Position = UDim2.new(0.9, -25, 0.8, -25)
+circleBtn.Size = UDim2.new(0, 40, 0, 40)
+circleBtn.Position = UDim2.new(0.92, -20, 0.85, -20)
 circleBtn.BackgroundColor3 = COLOR_BG
 circleBtn.Text = "H"
-circleBtn.Font = Enum.Font.GothamBold
-circleBtn.TextSize = 22
+circleBtn.Font = Enum.Font.Code
+circleBtn.TextSize = 18
 circleBtn.TextColor3 = COLOR_WHITE
 circleBtn.Active = true
 circleBtn.Draggable = true
+circleBtn.Visible = false
 circleBtn.Parent = hubGui
 Instance.new("UICorner", circleBtn).CornerRadius = UDim.new(1, 0)
 local circleStroke = Instance.new("UIStroke", circleBtn)
 circleStroke.Color = COLOR_WHITE
 circleStroke.Thickness = 2
 
--- --- PANEL PRINCIPAL ---
+-- Panel principal
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainPanel"
-mainFrame.Size = UDim2.new(0, 500, 0, 350)
-mainFrame.Position = UDim2.new(0.5, -250, 0.5, -175)
+mainFrame.Size = UDim2.new(0, 220, 0, 140)
+mainFrame.Position = UDim2.new(0.5, -110, 0.5, -70)
 mainFrame.BackgroundColor3 = COLOR_BG
 mainFrame.Active = true
 mainFrame.Draggable = true
-mainFrame.Visible = false
+mainFrame.Visible = true
 mainFrame.Parent = hubGui
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 4)
 local mainStroke = Instance.new("UIStroke", mainFrame)
 mainStroke.Color = COLOR_WHITE
 mainStroke.Thickness = 1.5
 
--- Fondo de imagen (placeholder)
-local bgImage = Instance.new("ImageLabel", mainFrame)
-bgImage.Size = UDim2.new(1, 0, 1, 0)
-bgImage.BackgroundTransparency = 1
-bgImage.Image = BACKGROUND_IMAGE_ID ~= "" and ("rbxassetid://" .. BACKGROUND_IMAGE_ID) or ""
-bgImage.ScaleType = Enum.ScaleType.Crop
-bgImage.ZIndex = 0
-
--- Capa superior para controles
-local topLayer = Instance.new("Frame", mainFrame)
-topLayer.Size = UDim2.new(1, 0, 0, 30)
-topLayer.BackgroundTransparency = 1
-topLayer.ZIndex = 10
+-- Barra superior
+local topBar = Instance.new("Frame", mainFrame)
+topBar.Size = UDim2.new(1, 0, 0, 30)
+topBar.Position = UDim2.new(0, 0, 0, 0)
+topBar.BackgroundColor3 = COLOR_PANEL
+topBar.ZIndex = 10
+Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 4)
+local topStroke = Instance.new("UIStroke", topBar)
+topStroke.Color = COLOR_WHITE
+topStroke.Thickness = 1
 
 -- Título
-local titleLabel = Instance.new("TextLabel", topLayer)
-titleLabel.Text = "EDSUSITO HUB"
-titleLabel.Font = Enum.Font.GothamBlack
-titleLabel.TextSize = 18
+local titleLabel = Instance.new("TextLabel", topBar)
+titleLabel.Text = "EDSUSITO GUN AURA"
+titleLabel.Font = Enum.Font.Code
+titleLabel.TextSize = 14
 titleLabel.TextColor3 = COLOR_WHITE
-titleLabel.Size = UDim2.new(0, 200, 1, 0)
-titleLabel.Position = UDim2.new(0, 15, 0, 0)
+titleLabel.Size = UDim2.new(0, 150, 1, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-
--- Gatito animado (círculo con carita)
-local catCircle = Instance.new("Frame", topLayer)
-catCircle.Size = UDim2.new(0, 26, 0, 26)
-catCircle.Position = UDim2.new(1, -70, 0.5, -13)
-catCircle.BackgroundColor3 = COLOR_PANEL
-catCircle.ZIndex = 10
-Instance.new("UICorner", catCircle).CornerRadius = UDim.new(1, 0)
-local catStroke = Instance.new("UIStroke", catCircle)
-catStroke.Color = COLOR_WHITE
-catStroke.Thickness = 1
-
-local faceLabel = Instance.new("TextLabel", catCircle)
-faceLabel.Size = UDim2.new(1, 0, 1, 0)
-faceLabel.BackgroundTransparency = 1
-faceLabel.Font = Enum.Font.Code
-faceLabel.TextSize = 14
-faceLabel.TextColor3 = COLOR_WHITE
-faceLabel.TextYAlignment = Enum.TextYAlignment.Center
-faceLabel.TextXAlignment = Enum.TextXAlignment.Center
-faceLabel.ZIndex = 11
-
-local faces = {"•‿•", "˘ω˘", "^_^", "・∀・", "•ω•", "T_T"}
-task.spawn(function()
-    local i = 1
-    while catCircle.Parent do
-        faceLabel.Text = faces[i]
-        i = i % #faces + 1
-        task.wait(0.8)
-    end
-end)
-
--- Botón minimizar
-local minimizeBtn = Instance.new("TextButton", topLayer)
-minimizeBtn.Size = UDim2.new(0, 24, 0, 24)
-minimizeBtn.Position = UDim2.new(1, -30, 0, 3)
-minimizeBtn.BackgroundColor3 = COLOR_PANEL
-minimizeBtn.Text = "_"
-minimizeBtn.Font = Enum.Font.GothamBold
-minimizeBtn.TextSize = 14
-minimizeBtn.TextColor3 = COLOR_WHITE
-Instance.new("UICorner", minimizeBtn).CornerRadius = UDim.new(0, 6)
+titleLabel.ZIndex = 11
 
 -- Botón cerrar
-local closeBtn = Instance.new("TextButton", topLayer)
-closeBtn.Size = UDim2.new(0, 24, 0, 24)
-closeBtn.Position = UDim2.new(1, -2, 0, 3)
+local closeBtn = Instance.new("TextButton", topBar)
+closeBtn.Size = UDim2.new(0, 22, 0, 22)
+closeBtn.Position = UDim2.new(1, -26, 0.5, -11)
 closeBtn.BackgroundColor3 = COLOR_PANEL
 closeBtn.Text = "X"
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 14
-closeBtn.TextColor3 = Color3.fromRGB(255, 60, 60)
-Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+closeBtn.Font = Enum.Font.Code
+closeBtn.TextSize = 12
+closeBtn.TextColor3 = COLOR_WHITE
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 2)
+closeBtn.ZIndex = 11
 
--- Sidebar (navegación)
-local sidebar = Instance.new("Frame", mainFrame)
-sidebar.Size = UDim2.new(0, 120, 1, -35)
-sidebar.Position = UDim2.new(0, 0, 0, 35)
-sidebar.BackgroundTransparency = 1
-sidebar.ZIndex = 5
+-- Función para crear un toggle
+local function createToggle(parent, y, label, default, callback)
+    local row = Instance.new("Frame", parent)
+    row.Size = UDim2.new(1, -10, 0, 28)
+    row.Position = UDim2.new(0, 5, 0, y)
+    row.BackgroundColor3 = COLOR_PANEL
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 2)
 
-local pages = {}
-local activeTab = nil
-
-local function createTabButton(name, order)
-    local btn = Instance.new("TextButton", sidebar)
-    btn.Size = UDim2.new(1, -10, 0, 28)
-    btn.Position = UDim2.new(0, 10, 0, order * 30)
-    btn.BackgroundColor3 = COLOR_PANEL
-    btn.Text = name
-    btn.Font = Enum.Font.GothamSemibold
-    btn.TextSize = 11
-    btn.TextColor3 = COLOR_WHITE
-    btn.TextXAlignment = Enum.TextXAlignment.Left
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    btn.ZIndex = 5
-    return btn
-end
-
--- Contenedor de páginas
-local pageContainer = Instance.new("Frame", mainFrame)
-pageContainer.Size = UDim2.new(1, -130, 1, -35)
-pageContainer.Position = UDim2.new(0, 125, 0, 35)
-pageContainer.BackgroundTransparency = 1
-pageContainer.ClipsDescendants = true
-pageContainer.ZIndex = 5
-
--- Función para cambiar pestaña
-local function switchTab(btn, page)
-    if activeTab then
-        activeTab.BackgroundColor3 = COLOR_PANEL
-    end
-    btn.BackgroundColor3 = COLOR_ACCENT
-    btn.TextColor3 = COLOR_TEXT_ON
-    activeTab = btn
-    for _, p in pairs(pages) do p.Visible = false end
-    page.Visible = true
-end
-
--- Crear páginas
-for i = 1, 8 do
-    local page = Instance.new("ScrollingFrame", pageContainer)
-    page.Size = UDim2.new(1, 0, 1, 0)
-    page.BackgroundTransparency = 1
-    page.ScrollBarThickness = 4
-    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    page.CanvasSize = UDim2.new(0, 0, 0, 0)
-    page.Visible = false
-    pages[i] = page
-    local layout = Instance.new("UIListLayout", page)
-    layout.Padding = UDim.new(0, 6)
-    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-end
-
-local function addToggle(page, text, default, callback)
-    local card = Instance.new("Frame", page)
-    card.Size = UDim2.new(1, -10, 0, 30)
-    card.BackgroundColor3 = COLOR_PANEL
-    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
-    
-    local lbl = Instance.new("TextLabel", card)
-    lbl.Text = text
-    lbl.Font = Enum.Font.Gotham
+    local lbl = Instance.new("TextLabel", row)
+    lbl.Text = label
+    lbl.Font = Enum.Font.Code
     lbl.TextSize = 12
     lbl.TextColor3 = COLOR_WHITE
-    lbl.Size = UDim2.new(0.7, 0, 1, 0)
-    lbl.Position = UDim2.new(0, 10, 0, 0)
+    lbl.Size = UDim2.new(0.6, 0, 1, 0)
+    lbl.Position = UDim2.new(0, 8, 0, 0)
     lbl.BackgroundTransparency = 1
     lbl.TextXAlignment = Enum.TextXAlignment.Left
 
-    local btn = Instance.new("TextButton", card)
-    btn.Size = UDim2.new(0, 50, 0, 22)
-    btn.Position = UDim2.new(1, -60, 0.5, -11)
+    local btn = Instance.new("TextButton", row)
+    btn.Size = UDim2.new(0, 50, 0, 20)
+    btn.Position = UDim2.new(1, -58, 0.5, -10)
     btn.BackgroundColor3 = default and COLOR_TOGGLE_ON or COLOR_TOGGLE_OFF
     btn.Text = default and "ON" or "OFF"
-    btn.Font = Enum.Font.GothamBold
+    btn.Font = Enum.Font.Code
     btn.TextSize = 11
     btn.TextColor3 = default and COLOR_TEXT_ON or COLOR_TEXT_OFF
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 2)
 
     local state = default
     local function refresh()
@@ -414,130 +325,31 @@ local function addToggle(page, text, default, callback)
     end
 end
 
-local function addSlider(page, text, min, max, default, callback)
-    local card = Instance.new("Frame", page)
-    card.Size = UDim2.new(1, -10, 0, 40)
-    card.BackgroundColor3 = COLOR_PANEL
-    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
-
-    local lbl = Instance.new("TextLabel", card)
-    lbl.Text = text
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 12
-    lbl.TextColor3 = COLOR_WHITE
-    lbl.Size = UDim2.new(1, -20, 0, 18)
-    lbl.Position = UDim2.new(0, 10, 0, 2)
-    lbl.BackgroundTransparency = 1
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-
-    local minus = Instance.new("TextButton", card)
-    minus.Size = UDim2.new(0, 20, 0, 20)
-    minus.Position = UDim2.new(1, -80, 0, 18)
-    minus.Text = "-"
-    minus.Font = Enum.Font.GothamBold
-    minus.TextSize = 14
-    minus.BackgroundColor3 = COLOR_TOGGLE_OFF
-    minus.TextColor3 = COLOR_WHITE
-    Instance.new("UICorner", minus).CornerRadius = UDim.new(0, 4)
-
-    local valLabel = Instance.new("TextLabel", card)
-    valLabel.Size = UDim2.new(0, 40, 0, 20)
-    valLabel.Position = UDim2.new(1, -58, 0, 18)
-    valLabel.Text = tostring(default)
-    valLabel.Font = Enum.Font.GothamBold
-    valLabel.TextSize = 12
-    valLabel.TextColor3 = COLOR_WHITE
-    valLabel.BackgroundTransparency = 1
-
-    local plus = Instance.new("TextButton", card)
-    plus.Size = UDim2.new(0, 20, 0, 20)
-    plus.Position = UDim2.new(1, -22, 0, 18)
-    plus.Text = "+"
-    plus.Font = Enum.Font.GothamBold
-    plus.TextSize = 14
-    plus.BackgroundColor3 = COLOR_TOGGLE_OFF
-    plus.TextColor3 = COLOR_WHITE
-    Instance.new("UICorner", plus).CornerRadius = UDim.new(0, 4)
-
-    local current = default
-    local function updateVal(v)
-        current = math.clamp(v, min, max)
-        valLabel.Text = tostring(current)
-        callback(current)
-    end
-
-    minus.MouseButton1Click:Connect(function() updateVal(current - 1) end)
-    plus.MouseButton1Click:Connect(function() updateVal(current + 1) end)
-end
-
--- ============================================================
--- LLENAR PESTAÑAS CON FUNCIONES (Sacred AHK completo)
--- ============================================================
--- Página 1: Stats
-local statsPage = pages[1]
-statsPage.Visible = true -- primera
-local statsCard = Instance.new("Frame", statsPage)
-statsCard.Size = UDim2.new(1, -10, 0, 150)
-statsCard.BackgroundColor3 = COLOR_PANEL
-Instance.new("UICorner", statsCard).CornerRadius = UDim.new(0, 8)
--- Aquí pondríamos stats del jugador (Level, Bounty, etc.) pero se actualizarán en tiempo real
--- (Código de stats abreviado para no alargar, se puede expandir)
-
--- Página 2: Combat
-local combatPage = pages[2]
-addToggle(combatPage, "Dragon Gun M1", _G.G_DragonGunM1, function(v) _G.G_DragonGunM1 = v end)
-addToggle(combatPage, "Attack Mobs", _G.G_AttackMobs, function(v) _G.G_AttackMobs = v end)
-addToggle(combatPage, "Attack Players", _G.G_AttackPlayers, function(v) _G.G_AttackPlayers = v end)
--- Aimbot Skills, etc. se añadirían aquí.
-
--- Página 3: ESP
-local espPage = pages[3]
-addToggle(espPage, "Master ESP", _G.G_ESPEnabled, function(v) _G.G_ESPEnabled = v; if v then EnableESP() else DisableESP() end end)
-addToggle(espPage, "ESP Name", _G.G_ESP_Name, function(v) _G.G_ESP_Name = v end)
-addToggle(espPage, "ESP Level", _G.G_ESP_Level, function(v) _G.G_ESP_Level = v end)
-addToggle(espPage, "ESP Bounty", _G.G_ESP_Bounty, function(v) _G.G_ESP_Bounty = v end)
-addToggle(espPage, "ESP Fruit", _G.G_ESP_Fruit, function(v) _G.G_ESP_Fruit = v end)
-addToggle(espPage, "ESP Distance", _G.G_ESP_Distance, function(v) _G.G_ESP_Distance = v end)
-addToggle(espPage, "ESP HP", _G.G_ESP_HP, function(v) _G.G_ESP_HP = v end)
-addSlider(espPage, "Text Size", 8, 24, _G.G_ESP_TextSize, function(v) _G.G_ESP_TextSize = v end)
-
--- Páginas 4-8: Más funciones (Soru, Sanguine, Fake Body, VFX, Misc) se añadirán progresivamente.
--- (Código completo de todas las funciones del Sacred AHK se integra aquí, resumido por espacio)
-
--- Aquí incluirías el resto de funciones: Soru infinito, Sanguine Z, Super Jump, Soul Guitar, etc.
--- (Se han omitido por brevedad pero estarán presentes en la versión final que te entrego)
-
--- ============================================================
--- LÓGICA DE BOTONES (abrir/cerrar/minimizar)
--- ============================================================
-circleBtn.MouseButton1Click:Connect(function()
-    mainFrame.Visible = not mainFrame.Visible
-    circleBtn.Visible = not mainFrame.Visible  -- oculta círculo si panel abierto
+-- Crear los 3 toggles
+local yPos = 36
+createToggle(mainFrame, yPos, "Dragon Gun M1", _G.G_DragonGunM1, function(v)
+    _G.G_DragonGunM1 = v
 end)
 
-minimizeBtn.MouseButton1Click:Connect(function()
+yPos = yPos + 32
+createToggle(mainFrame, yPos, "Attack Mobs", _G.G_AttackMobs, function(v)
+    _G.G_AttackMobs = v
+end)
+
+yPos = yPos + 32
+createToggle(mainFrame, yPos, "Attack Players", _G.G_AttackPlayers, function(v)
+    _G.G_AttackPlayers = v
+end)
+
+-- Lógica de botones
+circleBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = true
+    circleBtn.Visible = false
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
     mainFrame.Visible = false
     circleBtn.Visible = true
 end)
 
-closeBtn.MouseButton1Click:Connect(function()
-    hubGui:Destroy()  -- cierra todo
-end)
-
--- Tab buttons (ejemplo)
-local tab1 = createTabButton("Combat", 0)
-tab1.MouseButton1Click:Connect(function() switchTab(tab1, pages[2]) end)
--- Resto de tabs...
-
--- ============================================================
--- INICIALIZAR ESP (código del Sacred AHK adaptado)
--- ============================================================
--- (Aquí iría el sistema ESP completo, con highlights, billboard, etc.)
-
--- ============================================================
--- OTRAS FUNCIONES (Sanguine, Soru, Aimbot, etc.)
--- ============================================================
--- (Integrarás todas las funciones del script Sacred AHK, adaptándolas al nuevo UI)
--- Por motivos de espacio no pego todo, pero en tu panel real estarán.
-
-print("Edsusito Hub cargado correctamente.")
+print("Edsusito Gun Aura cargado correctamente.")
