@@ -2,7 +2,7 @@
 -- EDSUSITO GUN AURA - MINI GUI RETRO (Solo Dragon Gun M1)
 -- Diseño limpio blanco / gris / negro
 -- Ataca al objetivo más cercano (mobs o jugadores según toggles)
--- Delay de disparo: 0.016 (60 fps)
+-- Delay configurable via _G.G_DragonFireRate (por defecto 0.016)
 -- ============================================================
 
 -- Servicios
@@ -38,9 +38,9 @@ local COLOR_BORDER = Color3.fromRGB(255, 255, 255)   -- bordes blancos
 _G.G_DragonGunM1 = false
 _G.G_AttackMobs = true
 _G.G_AttackPlayers = true
-
--- [[ NUEVO FOCUS ]] Variable global del Focus Target
+_G.G_AttackSeaEvents = true        -- nuevo: atacar eventos marinos
 _G.G_FocusTarget = nil
+_G.G_DragonFireRate = 0.016       -- configurable (antes hardcoded 0.016)
 
 -- ============================================================
 -- DRAGON GUN M1 (Optimizado)
@@ -203,7 +203,7 @@ local function IsAlly(p1, p2)
 end
 
 -- ============================================================
--- OBTENER OBJETIVO MÁS CERCANO
+-- OBTENER OBJETIVO MÁS CERCANO (AHORA INCLUYE Sea Events)
 -- ============================================================
 function GetClosestDragonTarget()
     local char = player.Character
@@ -227,6 +227,7 @@ function GetClosestDragonTarget()
     local closest, dist = nil, math.huge
     local myPos = root.Position
 
+    -- Mobs / Enemies
     if _G.G_AttackMobs then
         local enemies = workspace:FindFirstChild("Enemies")
         if enemies then
@@ -244,6 +245,46 @@ function GetClosestDragonTarget()
         end
     end
 
+    -- Sea Events (nuevas detecciones similares al otro script)
+    if _G.G_AttackSeaEvents then
+        pcall(function()
+            for _, folderName in pairs({"SeaBeasts", "SeaEvents"}) do
+                local folder = workspace:FindFirstChild(folderName)
+                if folder then
+                    for _, m in pairs(folder:GetChildren()) do
+                        local hum = m:FindFirstChildOfClass("Humanoid")
+                        local r = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChild("Head")
+                        if r and (not hum or (hum and hum.Health > 0)) then
+                            local d = (r.Position - myPos).Magnitude
+                            if d < dist then
+                                dist = d
+                                closest = r
+                            end
+                        end
+                    end
+                end
+            end
+            -- Buscar modelos por nombre en workspace (barcos, bestias, etc.)
+            for _, obj in pairs(workspace:GetChildren()) do
+                if obj:IsA("Model") and obj ~= char and obj.Name then
+                    local name = string.lower(obj.Name)
+                    if name:find("ship") or name:find("boat") or name:find("beast") or name:find("terror") or name:find("piranha") or name:find("leviathan") then
+                        local hum = obj:FindFirstChildOfClass("Humanoid")
+                        local r = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChild("Head")
+                        if r and (not hum or (hum and hum.Health > 0)) then
+                            local d = (r.Position - myPos).Magnitude
+                            if d < dist then
+                                dist = d
+                                closest = r
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    -- Players
     if _G.G_AttackPlayers then
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= player and not IsAlly(player, p) then
@@ -263,10 +304,10 @@ function GetClosestDragonTarget()
     return closest
 end
 
--- Bucle Dragon M1 (delay 0.016)
+-- Bucle Dragon M1 (delay configurable por _G.G_DragonFireRate)
 task.spawn(function()
     while true do
-        task.wait(0.016)
+        task.wait(_G.G_DragonFireRate or 0.016)
         if _G.G_DragonGunM1 then
             pcall(function()
                 local char = player.Character
@@ -290,7 +331,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- MINI GUI RETRO (3 botones + selector Focus)
+-- MINI GUI RETRO (3 botones + selector Focus + logo "E")
 -- ============================================================
 for _, gui in pairs(playerGui:GetChildren()) do
     if gui.Name:match("EdsusitoGunAura") then
@@ -325,8 +366,8 @@ circleStroke.Thickness = 2
 -- [[ NUEVO FOCUS ]] Panel principal más alto para el selector
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainPanel"
-mainFrame.Size = UDim2.new(0, 220, 0, 320)
-mainFrame.Position = UDim2.new(0.5, -110, 0.5, -160)
+mainFrame.Size = UDim2.new(0, 220, 0, 360)
+mainFrame.Position = UDim2.new(0.5, -110, 0.5, -180)
 mainFrame.BackgroundColor3 = COLOR_BG
 mainFrame.Active = true
 mainFrame.Draggable = true
@@ -348,13 +389,25 @@ local topStroke = Instance.new("UIStroke", topBar)
 topStroke.Color = COLOR_WHITE
 topStroke.Thickness = 1
 
+-- Logo "E" clicable (nuevo)
+local logoBtn = Instance.new("TextButton", topBar)
+logoBtn.Size = UDim2.new(0, 26, 0, 22)
+logoBtn.Position = UDim2.new(0, 6, 0.5, -11)
+logoBtn.BackgroundColor3 = COLOR_PANEL
+logoBtn.Text = "E"
+logoBtn.Font = Enum.Font.Code
+logoBtn.TextSize = 14
+logoBtn.TextColor3 = COLOR_WHITE
+Instance.new("UICorner", logoBtn).CornerRadius = UDim.new(0, 4)
+logoBtn.ZIndex = 11
+
 local titleLabel = Instance.new("TextLabel", topBar)
 titleLabel.Text = "EDSUSITO GUN AURA"
 titleLabel.Font = Enum.Font.Code
 titleLabel.TextSize = 14
 titleLabel.TextColor3 = COLOR_WHITE
 titleLabel.Size = UDim2.new(0, 150, 1, 0)
-titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.Position = UDim2.new(0, 38, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.ZIndex = 11
@@ -424,7 +477,7 @@ local function createToggle(parent, y, label, default, callback)
     end
 end
 
--- Crear los 3 toggles originales
+-- Crear los toggles originales + nuevo toggle para SeaEvents
 local yPos = 36
 createToggle(mainFrame, yPos, "Dragon Gun M1", _G.G_DragonGunM1, function(v)
     _G.G_DragonGunM1 = v
@@ -438,6 +491,11 @@ end)
 yPos = yPos + 32
 createToggle(mainFrame, yPos, "Attack Players", _G.G_AttackPlayers, function(v)
     _G.G_AttackPlayers = v
+end)
+
+yPos = yPos + 32
+createToggle(mainFrame, yPos, "Attack SeaEvents", _G.G_AttackSeaEvents, function(v)
+    _G.G_AttackSeaEvents = v
 end)
 
 -- [[ NUEVO FOCUS ]] Etiqueta de estado del Focus
@@ -583,4 +641,19 @@ closeBtn.MouseButton1Click:Connect(function()
     circleBtn.Visible = true
 end)
 
-print("Edsusito Gun Aura cargado correctamente con Focus Target.")
+-- Logo "E" click alterna visibilidad (nuevo)
+logoBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
+    circleBtn.Visible = not mainFrame.Visible
+end)
+
+-- Tecla N para mostrar/ocultar (nuevo)
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.N then
+        mainFrame.Visible = not mainFrame.Visible
+        circleBtn.Visible = not mainFrame.Visible
+    end
+end)
+
+print("Edsusito Gun Aura cargado correctamente con Focus Target y Sea Events.")
