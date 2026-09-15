@@ -1,8 +1,6 @@
 -- ============================================================
--- EDSUSITO GUN AURA - MINI GUI RETRO (Solo Dragon Gun M1)
--- Diseño limpio blanco / gris / negro
--- Ataca al objetivo más cercano (mobs o jugadores según toggles)
--- Delay configurable via _G.G_DragonFireRate (por defecto 0.016)
+-- EDSUSITO GUN AURA
+-- Con toggles independientes: Ships + Leviathan
 -- ============================================================
 
 -- Servicios
@@ -21,95 +19,31 @@ local camera = workspace.CurrentCamera
 local mouse = player:GetMouse()
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Colores retro
-local COLOR_BG = Color3.fromRGB(0, 0, 0)             -- negro puro
-local COLOR_PANEL = Color3.fromRGB(25, 25, 25)       -- gris muy oscuro
-local COLOR_WHITE = Color3.fromRGB(255, 255, 255)    -- blanco
-local COLOR_GRAY = Color3.fromRGB(120, 120, 120)     -- gris medio
-local COLOR_TOGGLE_ON = Color3.fromRGB(255, 255, 255)-- toggle encendido (blanco)
-local COLOR_TOGGLE_OFF = Color3.fromRGB(45, 45, 45)  -- toggle apagado (gris oscuro)
-local COLOR_TEXT_ON = Color3.fromRGB(0, 0, 0)        -- texto negro sobre toggle blanco
-local COLOR_TEXT_OFF = Color3.fromRGB(255, 255, 255) -- texto blanco sobre toggle oscuro
-local COLOR_BORDER = Color3.fromRGB(255, 255, 255)   -- bordes blancos
+-- Colores
+local COLOR_BG          = Color3.fromRGB(12, 12, 12)
+local COLOR_PANEL       = Color3.fromRGB(22, 22, 22)
+local COLOR_BORDER      = Color3.fromRGB(55, 55, 55)
+local COLOR_TEXT        = Color3.fromRGB(215, 215, 215)
+local COLOR_TEXT_DIM    = Color3.fromRGB(145, 145, 145)
+local COLOR_TOGGLE_ON   = Color3.fromRGB(235, 235, 235)
+local COLOR_TOGGLE_OFF  = Color3.fromRGB(40, 40, 40)
+local COLOR_TEXT_ON     = Color3.fromRGB(20, 20, 20)
+local COLOR_TEXT_OFF    = Color3.fromRGB(185, 185, 185)
 
 -- ============================================================
--- VARIABLES GLOBALES DE CONFIGURACIÓN
+-- VARIABLES GLOBALES
 -- ============================================================
 _G.G_DragonGunM1 = false
 _G.G_AttackMobs = true
 _G.G_AttackPlayers = true
 _G.G_AttackSeaEvents = true
-_G.G_AttackBoats = false  -- NUEVO: toggle para atacar barcos
+_G.G_AttackShips = true          -- NUEVO
+_G.G_AttackLeviathan = true      -- NUEVO
 _G.G_FocusTarget = nil
 _G.G_DragonFireRate = 0.016
 
 -- ============================================================
--- LISTA DE EVENTOS MARINOS VALIDOS
--- ============================================================
-local VALID_SEA_EVENTS = {
-    "Leviathan",
-    "Leviathan Segment",
-    "Leviathan Tail",
-    "SeaBeast1",
-    "SeaBeast",
-    "Shark",
-    "Piranha",
-    "Terrorshark",
-    "TerrorShark",
-    "Terror Shark",
-    "Fish Crew Member",
-    "Haunted Crew Member",
-    "Sea Beast Trial",
-    "Serpent",
-    "Kraken",
-}
-
--- ============================================================
--- LISTA DE BARCOS A ATACAR
--- ============================================================
-local VALID_BOATS = {
-    "Pirate Brigade",
-    "Pirate Grand Brigade",
-    "Fish Boat",
-    "PirateGrandBrigade",
-    "PirateBrigade",
-    "FishBoat",
-}
-
--- ============================================================
--- FUNCIÓN PARA VALIDAR EVENTOS MARINOS
--- ============================================================
-local function IsValidSeaEvent(objName)
-    if not objName then return false end
-    local lowerName = string.lower(objName)
-    
-    for _, validEvent in ipairs(VALID_SEA_EVENTS) do
-        if string.lower(validEvent) == lowerName or 
-           string.find(lowerName, string.lower(validEvent)) then
-            return true
-        end
-    end
-    return false
-end
-
--- ============================================================
--- FUNCIÓN PARA VALIDAR BARCOS
--- ============================================================
-local function IsValidBoat(objName)
-    if not objName then return false end
-    local lowerName = string.lower(objName)
-    
-    for _, boatName in ipairs(VALID_BOATS) do
-        if string.lower(boatName) == lowerName or 
-           string.find(lowerName, string.lower(boatName)) then
-            return true
-        end
-    end
-    return false
-end
-
--- ============================================================
--- DRAGON GUN M1 (Optimizado)
+-- DRAGON GUN M1
 -- ============================================================
 local DragonModules = ReplicatedStorage:WaitForChild("Modules")
 local DragonNet = DragonModules:WaitForChild("Net")
@@ -117,7 +51,7 @@ local ShootGunEvent = DragonNet:WaitForChild("RE/ShootGunEvent")
 local Validator2 = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Validator2")
 
 local getupval = debug.getupvalue
-local setupval = debug.setupval
+local setupval = debug.setupvalue
 local getupvals = debug.getupvalues
 
 local ShootFunction
@@ -269,13 +203,14 @@ local function IsAlly(p1, p2)
 end
 
 -- ============================================================
--- OBTENER OBJETIVO MÁS CERCANO
+-- OBTENER OBJETIVO MÁS CERCANO (CON PRIORIDAD)
 -- ============================================================
 function GetClosestDragonTarget()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
 
+    -- 1. FOCUS (prioridad absoluta)
     if _G.G_FocusTarget then
         local focusPlayer = _G.G_FocusTarget
         local focusChar = focusPlayer.Character
@@ -291,36 +226,93 @@ function GetClosestDragonTarget()
     local closest, dist = nil, math.huge
     local myPos = root.Position
 
-    -- Mobs / Enemies
-    if _G.G_AttackMobs then
+    -- 2. LEVIATHAN (prioridad alta)
+    if _G.G_AttackLeviathan then
+        local seaBeasts = workspace:FindFirstChild("SeaBeasts")
+        if seaBeasts then
+            local levi = seaBeasts:FindFirstChild("Leviathan")
+            if levi then
+                local r = levi:FindFirstChild("HumanoidRootPart")
+                    or levi:FindFirstChild("Hitbox13")
+                    or levi.PrimaryPart
+                    or levi:FindFirstChildWhichIsA("BasePart")
+                if r then
+                    return r -- Prioridad máxima, devolvemos ya
+                end
+            end
+        end
+    end
+
+    -- 3. BARCOS (prioridad alta)
+    if _G.G_AttackShips then
         local enemies = workspace:FindFirstChild("Enemies")
         if enemies then
-            for _, enemy in pairs(enemies:GetChildren()) do
-                local hum = enemy:FindFirstChildOfClass("Humanoid")
-                local r = enemy:FindFirstChild("HumanoidRootPart")
-                if hum and hum.Health > 0 and r then
-                    local d = (r.Position - myPos).Magnitude
-                    if d < dist then
-                        dist = d
-                        closest = r
+            local shipNames = {
+                "PirateBrigade",
+                "PirateGrandBrigade",
+                "MarineBrigade",
+                "MarineGrandBrigade",
+                "FishBoat"
+            }
+
+            for _, shipName in ipairs(shipNames) do
+                local ship = enemies:FindFirstChild(shipName)
+                if ship then
+                    local hum = ship:FindFirstChildOfClass("Humanoid")
+                    local r = ship.PrimaryPart
+                        or ship:FindFirstChild("HumanoidRootPart")
+                        or ship:FindFirstChildWhichIsA("BasePart")
+
+                    if r and (not hum or hum.Health > 0) then
+                        local d = (r.Position - myPos).Magnitude
+                        if d < dist then
+                            dist = d
+                            closest = r
+                        end
+                    end
+                end
+            end
+
+            -- Por si hay más variantes
+            for _, obj in pairs(enemies:GetChildren()) do
+                local name = obj.Name
+                if name:find("Brigade") or name:find("Boat") or name:find("Ship") then
+                    local hum = obj:FindFirstChildOfClass("Humanoid")
+                    local r = obj.PrimaryPart
+                        or obj:FindFirstChild("HumanoidRootPart")
+                        or obj:FindFirstChildWhichIsA("BasePart")
+                    if r and (not hum or hum.Health > 0) then
+                        local d = (r.Position - myPos).Magnitude
+                        if d < dist then
+                            dist = d
+                            closest = r
+                        end
                     end
                 end
             end
         end
     end
 
-    -- SEA EVENTS (LISTA BLANCA)
+    -- 4. SEA EVENTS normal (SeaBeasts, Terrorshark, etc.)
     if _G.G_AttackSeaEvents then
         pcall(function()
-            -- Método 1: Buscar en carpetas conocidas
-            for _, folderName in pairs({"SeaBeasts", "SeaEvents"}) do
-                local folder = workspace:FindFirstChild(folderName)
-                if folder then
-                    for _, m in pairs(folder:GetChildren()) do
-                        if IsValidSeaEvent(m.Name) then
-                            local hum = m:FindFirstChildOfClass("Humanoid")
-                            local r = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChild("Head")
-                            if r and (not hum or (hum and hum.Health > 0)) then
+            -- SeaBeasts
+            local seaBeasts = workspace:FindFirstChild("SeaBeasts")
+            if seaBeasts then
+                for _, beast in pairs(seaBeasts:GetChildren()) do
+                    if beast.Name ~= "Leviathan" then
+                        local hum = beast:FindFirstChildOfClass("Humanoid") or beast:FindFirstChild("Health")
+                        local r = beast:FindFirstChild("HumanoidRootPart") or beast.PrimaryPart or beast:FindFirstChild("Head")
+                        if r then
+                            local alive = true
+                            if hum then
+                                if hum:IsA("Humanoid") then
+                                    alive = hum.Health > 0
+                                elseif hum:IsA("NumberValue") or hum:IsA("IntValue") then
+                                    alive = hum.Value > 0
+                                end
+                            end
+                            if alive then
                                 local d = (r.Position - myPos).Magnitude
                                 if d < dist then
                                     dist = d
@@ -332,13 +324,13 @@ function GetClosestDragonTarget()
                 end
             end
 
-            -- Método 2: Buscar en workspace.Enemies solo eventos válidos
+            -- Terrorshark
             local enemies = workspace:FindFirstChild("Enemies")
             if enemies then
-                for _, obj in pairs(enemies:GetChildren()) do
-                    if IsValidSeaEvent(obj.Name) then
-                        local hum = obj:FindFirstChildOfClass("Humanoid")
-                        local r = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChild("Head")
+                for _, enemy in pairs(enemies:GetChildren()) do
+                    if enemy.Name == "Terrorshark" then
+                        local hum = enemy:FindFirstChildOfClass("Humanoid")
+                        local r = enemy:FindFirstChild("HumanoidRootPart")
                         if hum and hum.Health > 0 and r then
                             local d = (r.Position - myPos).Magnitude
                             if d < dist then
@@ -349,44 +341,18 @@ function GetClosestDragonTarget()
                     end
                 end
             end
-
-            -- Método 3: Búsqueda exhaustiva en la lista blanca
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if obj:IsA("Model") and obj ~= char and IsValidSeaEvent(obj.Name) then
-                    local hum = obj:FindFirstChildOfClass("Humanoid")
-                    local r = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChild("Head")
-                    
-                    if hum and hum.Health > 0 and r then
-                        local isPlayer = false
-                        for _, p in pairs(Players:GetPlayers()) do
-                            if obj == p.Character then
-                                isPlayer = true
-                                break
-                            end
-                        end
-                        
-                        if not isPlayer then
-                            local d = (r.Position - myPos).Magnitude
-                            if d < dist then
-                                dist = d
-                                closest = r
-                            end
-                        end
-                    end
-                end
-            end
         end)
     end
 
-    -- BARCOS (SOLO SI ESTÁ ACTIVADO)
-    if _G.G_AttackBoats then
-        pcall(function()
-            for _, obj in pairs(workspace:GetChildren()) do
-                if obj:IsA("Model") and obj ~= char and IsValidBoat(obj.Name) then
-                    local hum = obj:FindFirstChildOfClass("Humanoid")
-                    local r = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChild("Head")
-                    
-                    if r and (not hum or (hum and hum.Health > 0)) then
+    -- 5. MOBS normales
+    if _G.G_AttackMobs then
+        local enemies = workspace:FindFirstChild("Enemies")
+        if enemies then
+            for _, enemy in pairs(enemies:GetChildren()) do
+                if enemy.Name ~= "Terrorshark" and not enemy.Name:find("Brigade") and not enemy.Name:find("Boat") then
+                    local hum = enemy:FindFirstChildOfClass("Humanoid")
+                    local r = enemy:FindFirstChild("HumanoidRootPart")
+                    if hum and hum.Health > 0 and r then
                         local d = (r.Position - myPos).Magnitude
                         if d < dist then
                             dist = d
@@ -395,36 +361,10 @@ function GetClosestDragonTarget()
                     end
                 end
             end
-            
-            -- Búsqueda más exhaustiva
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if obj:IsA("Model") and obj ~= char and IsValidBoat(obj.Name) then
-                    local hum = obj:FindFirstChildOfClass("Humanoid")
-                    local r = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChild("Head")
-                    
-                    if r and (not hum or (hum and hum.Health > 0)) then
-                        local isPlayer = false
-                        for _, p in pairs(Players:GetPlayers()) do
-                            if obj == p.Character then
-                                isPlayer = true
-                                break
-                            end
-                        end
-                        
-                        if not isPlayer then
-                            local d = (r.Position - myPos).Magnitude
-                            if d < dist then
-                                dist = d
-                                closest = r
-                            end
-                        end
-                    end
-                end
-            end
-        end)
+        end
     end
 
-    -- Players
+    -- 6. PLAYERS
     if _G.G_AttackPlayers then
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= player and not IsAlly(player, p) then
@@ -471,7 +411,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- MINI GUI RETRO
+-- GUI
 -- ============================================================
 for _, gui in pairs(playerGui:GetChildren()) do
     if gui.Name:match("EdsusitoGunAura") then
@@ -485,106 +425,115 @@ hubGui.ResetOnSpawn = false
 hubGui.IgnoreGuiInset = true
 hubGui.Parent = playerGui
 
+-- Círculo minimizado
 local circleBtn = Instance.new("TextButton")
-circleBtn.Size = UDim2.new(0, 40, 0, 40)
-circleBtn.Position = UDim2.new(0.92, -20, 0.85, -20)
+circleBtn.Size = UDim2.new(0, 42, 0, 42)
+circleBtn.Position = UDim2.new(0.92, -21, 0.85, -21)
 circleBtn.BackgroundColor3 = COLOR_BG
-circleBtn.Text = "H"
-circleBtn.Font = Enum.Font.Code
+circleBtn.BackgroundTransparency = 0.15
+circleBtn.Text = "E"
+circleBtn.Font = Enum.Font.GothamMedium
 circleBtn.TextSize = 18
-circleBtn.TextColor3 = COLOR_WHITE
+circleBtn.TextColor3 = COLOR_TEXT
 circleBtn.Active = true
 circleBtn.Draggable = true
 circleBtn.Visible = false
 circleBtn.Parent = hubGui
 Instance.new("UICorner", circleBtn).CornerRadius = UDim.new(1, 0)
 local circleStroke = Instance.new("UIStroke", circleBtn)
-circleStroke.Color = COLOR_WHITE
-circleStroke.Thickness = 2
+circleStroke.Color = COLOR_BORDER
+circleStroke.Thickness = 1.4
+circleStroke.Transparency = 0.3
 
+-- Panel principal (más alto por los 2 toggles nuevos)
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainPanel"
-mainFrame.Size = UDim2.new(0, 220, 0, 395)
-mainFrame.Position = UDim2.new(0.5, -110, 0.5, -197)
+mainFrame.Size = UDim2.new(0, 230, 0, 440)
+mainFrame.Position = UDim2.new(0.5, -115, 0.5, -220)
 mainFrame.BackgroundColor3 = COLOR_BG
+mainFrame.BackgroundTransparency = 0.18
 mainFrame.Active = true
 mainFrame.Draggable = true
 mainFrame.Visible = true
 mainFrame.Parent = hubGui
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 4)
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 local mainStroke = Instance.new("UIStroke", mainFrame)
-mainStroke.Color = COLOR_WHITE
-mainStroke.Thickness = 1.5
+mainStroke.Color = COLOR_BORDER
+mainStroke.Thickness = 1
+mainStroke.Transparency = 0.35
 
+-- Barra superior
 local topBar = Instance.new("Frame", mainFrame)
-topBar.Size = UDim2.new(1, 0, 0, 30)
+topBar.Size = UDim2.new(1, 0, 0, 34)
 topBar.Position = UDim2.new(0, 0, 0, 0)
 topBar.BackgroundColor3 = COLOR_PANEL
+topBar.BackgroundTransparency = 0.25
 topBar.ZIndex = 10
-Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 4)
-local topStroke = Instance.new("UIStroke", topBar)
-topStroke.Color = COLOR_WHITE
-topStroke.Thickness = 1
+Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 10)
 
 local logoBtn = Instance.new("TextButton", topBar)
-logoBtn.Size = UDim2.new(0, 26, 0, 22)
-logoBtn.Position = UDim2.new(0, 6, 0.5, -11)
-logoBtn.BackgroundColor3 = COLOR_PANEL
+logoBtn.Size = UDim2.new(0, 28, 0, 24)
+logoBtn.Position = UDim2.new(0, 8, 0.5, -12)
+logoBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+logoBtn.BackgroundTransparency = 0.3
 logoBtn.Text = "E"
-logoBtn.Font = Enum.Font.Code
+logoBtn.Font = Enum.Font.GothamMedium
 logoBtn.TextSize = 14
-logoBtn.TextColor3 = COLOR_WHITE
-Instance.new("UICorner", logoBtn).CornerRadius = UDim.new(0, 4)
+logoBtn.TextColor3 = COLOR_TEXT
 logoBtn.ZIndex = 11
+Instance.new("UICorner", logoBtn).CornerRadius = UDim.new(0, 6)
 
 local titleLabel = Instance.new("TextLabel", topBar)
 titleLabel.Text = "EDSUSITO GUN AURA"
-titleLabel.Font = Enum.Font.Code
-titleLabel.TextSize = 14
-titleLabel.TextColor3 = COLOR_WHITE
+titleLabel.Font = Enum.Font.GothamMedium
+titleLabel.TextSize = 13
+titleLabel.TextColor3 = COLOR_TEXT
 titleLabel.Size = UDim2.new(0, 150, 1, 0)
-titleLabel.Position = UDim2.new(0, 38, 0, 0)
+titleLabel.Position = UDim2.new(0, 42, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.ZIndex = 11
 
 local closeBtn = Instance.new("TextButton", topBar)
-closeBtn.Size = UDim2.new(0, 22, 0, 22)
-closeBtn.Position = UDim2.new(1, -26, 0.5, -11)
-closeBtn.BackgroundColor3 = COLOR_PANEL
-closeBtn.Text = "X"
-closeBtn.Font = Enum.Font.Code
-closeBtn.TextSize = 12
-closeBtn.TextColor3 = COLOR_WHITE
-Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 2)
+closeBtn.Size = UDim2.new(0, 24, 0, 24)
+closeBtn.Position = UDim2.new(1, -30, 0.5, -12)
+closeBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+closeBtn.BackgroundTransparency = 0.3
+closeBtn.Text = "×"
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 16
+closeBtn.TextColor3 = COLOR_TEXT_DIM
 closeBtn.ZIndex = 11
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
 
+-- Función toggles
 local function createToggle(parent, y, label, default, callback)
     local row = Instance.new("Frame", parent)
-    row.Size = UDim2.new(1, -10, 0, 28)
-    row.Position = UDim2.new(0, 5, 0, y)
+    row.Size = UDim2.new(1, -16, 0, 32)
+    row.Position = UDim2.new(0, 8, 0, y)
     row.BackgroundColor3 = COLOR_PANEL
-    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 2)
+    row.BackgroundTransparency = 0.35
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
 
     local lbl = Instance.new("TextLabel", row)
     lbl.Text = label
-    lbl.Font = Enum.Font.Code
+    lbl.Font = Enum.Font.Gotham
     lbl.TextSize = 12
-    lbl.TextColor3 = COLOR_WHITE
-    lbl.Size = UDim2.new(0.6, 0, 1, 0)
-    lbl.Position = UDim2.new(0, 8, 0, 0)
+    lbl.TextColor3 = COLOR_TEXT
+    lbl.Size = UDim2.new(0.62, 0, 1, 0)
+    lbl.Position = UDim2.new(0, 12, 0, 0)
     lbl.BackgroundTransparency = 1
     lbl.TextXAlignment = Enum.TextXAlignment.Left
 
     local btn = Instance.new("TextButton", row)
-    btn.Size = UDim2.new(0, 50, 0, 20)
-    btn.Position = UDim2.new(1, -58, 0.5, -10)
+    btn.Size = UDim2.new(0, 52, 0, 22)
+    btn.Position = UDim2.new(1, -62, 0.5, -11)
     btn.BackgroundColor3 = default and COLOR_TOGGLE_ON or COLOR_TOGGLE_OFF
     btn.Text = default and "ON" or "OFF"
-    btn.Font = Enum.Font.Code
+    btn.Font = Enum.Font.GothamMedium
     btn.TextSize = 11
     btn.TextColor3 = default and COLOR_TEXT_ON or COLOR_TEXT_OFF
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 2)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
 
     local state = default
     local function refresh()
@@ -605,61 +554,63 @@ local function createToggle(parent, y, label, default, callback)
         callback(state)
     end)
 
-    return btn, function(newState)
-        state = newState
-        refresh()
-        callback(state)
-    end
+    return btn
 end
 
-local yPos = 36
+-- Toggles
+local yPos = 44
 createToggle(mainFrame, yPos, "Dragon Gun M1", _G.G_DragonGunM1, function(v)
     _G.G_DragonGunM1 = v
 end)
 
-yPos = yPos + 32
+yPos = yPos + 38
 createToggle(mainFrame, yPos, "Attack Mobs", _G.G_AttackMobs, function(v)
     _G.G_AttackMobs = v
 end)
 
-yPos = yPos + 32
+yPos = yPos + 38
 createToggle(mainFrame, yPos, "Attack Players", _G.G_AttackPlayers, function(v)
     _G.G_AttackPlayers = v
 end)
 
-yPos = yPos + 32
+yPos = yPos + 38
 createToggle(mainFrame, yPos, "Attack SeaEvents", _G.G_AttackSeaEvents, function(v)
     _G.G_AttackSeaEvents = v
 end)
 
-yPos = yPos + 32
-createToggle(mainFrame, yPos, "Attack Boats", _G.G_AttackBoats, function(v)
-    _G.G_AttackBoats = v
+yPos = yPos + 38
+createToggle(mainFrame, yPos, "Attack Ships", _G.G_AttackShips, function(v)
+    _G.G_AttackShips = v
 end)
 
+yPos = yPos + 38
+createToggle(mainFrame, yPos, "Attack Leviathan", _G.G_AttackLeviathan, function(v)
+    _G.G_AttackLeviathan = v
+end)
+
+-- Focus
 local focusStatusLabel = Instance.new("TextLabel", mainFrame)
-focusStatusLabel.Size = UDim2.new(1, -10, 0, 18)
-focusStatusLabel.Position = UDim2.new(0, 5, 0, yPos + 32)
+focusStatusLabel.Size = UDim2.new(1, -16, 0, 18)
+focusStatusLabel.Position = UDim2.new(0, 8, 0, yPos + 42)
 focusStatusLabel.BackgroundTransparency = 1
-focusStatusLabel.Font = Enum.Font.Code
+focusStatusLabel.Font = Enum.Font.Gotham
 focusStatusLabel.TextSize = 11
-focusStatusLabel.TextColor3 = COLOR_GRAY
+focusStatusLabel.TextColor3 = COLOR_TEXT_DIM
 focusStatusLabel.Text = "Focus: None"
 focusStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 local scrollFrame = Instance.new("ScrollingFrame", mainFrame)
-scrollFrame.Size = UDim2.new(1, -10, 0, 110)
-scrollFrame.Position = UDim2.new(0, 5, 0, yPos + 50)
+scrollFrame.Size = UDim2.new(1, -16, 0, 100)
+scrollFrame.Position = UDim2.new(0, 8, 0, yPos + 64)
 scrollFrame.BackgroundColor3 = COLOR_PANEL
-scrollFrame.BorderColor3 = COLOR_WHITE
-scrollFrame.ScrollBarThickness = 4
+scrollFrame.BackgroundTransparency = 0.4
+scrollFrame.BorderSizePixel = 0
+scrollFrame.ScrollBarThickness = 3
+scrollFrame.ScrollBarImageColor3 = COLOR_BORDER
 scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
 scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-Instance.new("UICorner", scrollFrame).CornerRadius = UDim.new(0, 2)
-local scrollStroke = Instance.new("UIStroke", scrollFrame)
-scrollStroke.Color = COLOR_WHITE
-scrollStroke.Thickness = 1
+Instance.new("UICorner", scrollFrame).CornerRadius = UDim.new(0, 7)
 
 local playerListHolder = Instance.new("Frame", scrollFrame)
 playerListHolder.Size = UDim2.new(1, 0, 0, 0)
@@ -668,17 +619,18 @@ playerListHolder.AutomaticSize = Enum.AutomaticSize.Y
 
 local playerListLayout = Instance.new("UIListLayout", playerListHolder)
 playerListLayout.SortOrder = Enum.SortOrder.Name
-playerListLayout.Padding = UDim.new(0, 2)
+playerListLayout.Padding = UDim.new(0, 3)
 
 local clearFocusBtn = Instance.new("TextButton", mainFrame)
-clearFocusBtn.Size = UDim2.new(1, -10, 0, 22)
-clearFocusBtn.Position = UDim2.new(0, 5, 0, yPos + 165)
+clearFocusBtn.Size = UDim2.new(1, -16, 0, 26)
+clearFocusBtn.Position = UDim2.new(0, 8, 0, yPos + 172)
 clearFocusBtn.BackgroundColor3 = COLOR_PANEL
+clearFocusBtn.BackgroundTransparency = 0.35
 clearFocusBtn.Text = "CLEAR FOCUS"
-clearFocusBtn.Font = Enum.Font.Code
+clearFocusBtn.Font = Enum.Font.GothamMedium
 clearFocusBtn.TextSize = 11
-clearFocusBtn.TextColor3 = COLOR_WHITE
-Instance.new("UICorner", clearFocusBtn).CornerRadius = UDim.new(0, 2)
+clearFocusBtn.TextColor3 = COLOR_TEXT_DIM
+Instance.new("UICorner", clearFocusBtn).CornerRadius = UDim.new(0, 7)
 
 local playerButtons = {}
 
@@ -705,18 +657,20 @@ local function RefreshPlayerList()
         if p ~= player then
             local btn = Instance.new("TextButton", playerListHolder)
             btn.Name = p.Name
-            btn.Size = UDim2.new(1, -8, 0, 22)
+            btn.Size = UDim2.new(1, -10, 0, 24)
             btn.BackgroundColor3 = COLOR_TOGGLE_OFF
-            btn.Font = Enum.Font.Code
+            btn.BackgroundTransparency = 0.25
+            btn.Font = Enum.Font.Gotham
             btn.TextSize = 11
             btn.Text = p.Name
             btn.TextColor3 = COLOR_TEXT_OFF
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 2)
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
 
             playerButtons[p] = btn
 
             if _G.G_FocusTarget == p then
                 btn.BackgroundColor3 = COLOR_TOGGLE_ON
+                btn.BackgroundTransparency = 0
                 btn.TextColor3 = COLOR_TEXT_ON
             end
 
@@ -729,10 +683,10 @@ local function RefreshPlayerList()
 
     if _G.G_FocusTarget then
         focusStatusLabel.Text = "Focus: " .. _G.G_FocusTarget.Name
-        focusStatusLabel.TextColor3 = COLOR_WHITE
+        focusStatusLabel.TextColor3 = COLOR_TEXT
     else
         focusStatusLabel.Text = "Focus: None"
-        focusStatusLabel.TextColor3 = COLOR_GRAY
+        focusStatusLabel.TextColor3 = COLOR_TEXT_DIM
     end
 end
 
@@ -741,10 +695,7 @@ clearFocusBtn.MouseButton1Click:Connect(function()
     RefreshPlayerList()
 end)
 
-Players.PlayerAdded:Connect(function()
-    RefreshPlayerList()
-end)
-
+Players.PlayerAdded:Connect(RefreshPlayerList)
 Players.PlayerRemoving:Connect(function(p)
     if _G.G_FocusTarget == p then
         _G.G_FocusTarget = nil
@@ -754,6 +705,7 @@ end)
 
 RefreshPlayerList()
 
+-- Abrir / cerrar
 circleBtn.MouseButton1Click:Connect(function()
     mainFrame.Visible = true
     circleBtn.Visible = false
@@ -777,4 +729,4 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
-print("Edsusito Gun Aura cargado - Toggle para atacar barcos disponible")
+print("Edsusito Gun Aura cargado | Ships + Leviathan independientes")
