@@ -307,7 +307,7 @@ end
 -- Bucle Dragon M1 (delay configurable por _G.G_DragonFireRate)
 task.spawn(function()
     while true do
-        task.wait(_G.G_DragonFireRate or 0.016)
+        task.wait(_G.G_DragonFireRate or 0.0016)
         if _G.G_DragonGunM1 then
             pcall(function()
                 local char = player.Character
