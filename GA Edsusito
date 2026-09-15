@@ -1,6 +1,9 @@
 -- ============================================================
 -- EDSUSITO GUN AURA
--- Con toggles independientes: Ships + Leviathan
+-- Ships + Leviathan independientes
+-- + Detección robusta de barcos
+-- + Distancia máxima 800
+-- + Limpieza agresiva de targets muertos
 -- ============================================================
 
 -- Servicios
@@ -37,10 +40,12 @@ _G.G_DragonGunM1 = false
 _G.G_AttackMobs = true
 _G.G_AttackPlayers = true
 _G.G_AttackSeaEvents = true
-_G.G_AttackShips = true          -- NUEVO
-_G.G_AttackLeviathan = true      -- NUEVO
+_G.G_AttackShips = true
+_G.G_AttackLeviathan = true
 _G.G_FocusTarget = nil
-_G.G_DragonFireRate = 0.016
+_G.G_DragonFireRate = 0.0155
+
+local MAX_DISTANCE = 800 -- Distancia máxima de ataque
 
 -- ============================================================
 -- DRAGON GUN M1
@@ -105,7 +110,7 @@ function GetNextValidator()
 end
 
 -- ============================================================
--- DETECCIÓN DE ALIADOS / ENEMIGOS
+-- DETECCIÓN DE ALIADOS
 -- ============================================================
 local function Trim(s)
     return s:match("^%s*(.-)%s*$")
@@ -203,87 +208,91 @@ local function IsAlly(p1, p2)
 end
 
 -- ============================================================
--- OBTENER OBJETIVO MÁS CERCANO (CON PRIORIDAD)
+-- OBTENER OBJETIVO MÁS CERCANO (MEJORADO)
 -- ============================================================
 function GetClosestDragonTarget()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
 
-    -- 1. FOCUS (prioridad absoluta)
+    -- 1. FOCUS
     if _G.G_FocusTarget then
         local focusPlayer = _G.G_FocusTarget
         local focusChar = focusPlayer.Character
         local focusHum = focusChar and focusChar:FindFirstChildOfClass("Humanoid")
         local focusRoot = focusChar and focusChar:FindFirstChild("HumanoidRootPart")
+
         if focusHum and focusHum.Health > 0 and focusRoot then
-            return focusRoot
-        else
-            return nil
+            local d = (focusRoot.Position - root.Position).Magnitude
+            if d <= MAX_DISTANCE then
+                return focusRoot
+            end
         end
+        return nil
     end
 
     local closest, dist = nil, math.huge
     local myPos = root.Position
 
-    -- 2. LEVIATHAN (prioridad alta)
+    -- Función para verificar si está vivo
+    local function IsAlive(model)
+        if not model or not model.Parent then return false end
+        local hum = model:FindFirstChildOfClass("Humanoid")
+        if hum then
+            return hum.Health > 0
+        end
+        local healthValue = model:FindFirstChild("Health")
+        if healthValue and (healthValue:IsA("NumberValue") or healthValue:IsA("IntValue")) then
+            return healthValue.Value > 0
+        end
+        return true
+    end
+
+    -- 2. LEVIATHAN
     if _G.G_AttackLeviathan then
         local seaBeasts = workspace:FindFirstChild("SeaBeasts")
         if seaBeasts then
             local levi = seaBeasts:FindFirstChild("Leviathan")
-            if levi then
+            if levi and IsAlive(levi) then
                 local r = levi:FindFirstChild("HumanoidRootPart")
                     or levi:FindFirstChild("Hitbox13")
                     or levi.PrimaryPart
                     or levi:FindFirstChildWhichIsA("BasePart")
+
                 if r then
-                    return r -- Prioridad máxima, devolvemos ya
+                    local d = (r.Position - myPos).Magnitude
+                    if d <= MAX_DISTANCE then
+                        return r
+                    end
                 end
             end
         end
     end
 
-    -- 3. BARCOS (prioridad alta)
+    -- 3. BARCOS (detección robusta)
     if _G.G_AttackShips then
         local enemies = workspace:FindFirstChild("Enemies")
         if enemies then
-            local shipNames = {
-                "PirateBrigade",
-                "PirateGrandBrigade",
-                "MarineBrigade",
-                "MarineGrandBrigade",
-                "FishBoat"
-            }
-
-            for _, shipName in ipairs(shipNames) do
-                local ship = enemies:FindFirstChild(shipName)
-                if ship then
-                    local hum = ship:FindFirstChildOfClass("Humanoid")
-                    local r = ship.PrimaryPart
-                        or ship:FindFirstChild("HumanoidRootPart")
-                        or ship:FindFirstChildWhichIsA("BasePart")
-
-                    if r and (not hum or hum.Health > 0) then
-                        local d = (r.Position - myPos).Magnitude
-                        if d < dist then
-                            dist = d
-                            closest = r
-                        end
-                    end
-                end
-            end
-
-            -- Por si hay más variantes
             for _, obj in pairs(enemies:GetChildren()) do
                 local name = obj.Name
-                if name:find("Brigade") or name:find("Boat") or name:find("Ship") then
-                    local hum = obj:FindFirstChildOfClass("Humanoid")
+
+                local isShip = name == "PirateBrigade"
+                    or name == "PirateGrandBrigade"
+                    or name == "MarineBrigade"
+                    or name == "MarineGrandBrigade"
+                    or name == "FishBoat"
+                    or name:find("Brigade")
+                    or name:find("Boat")
+                    or name:find("Ship")
+
+                if isShip and IsAlive(obj) then
                     local r = obj.PrimaryPart
                         or obj:FindFirstChild("HumanoidRootPart")
                         or obj:FindFirstChildWhichIsA("BasePart")
-                    if r and (not hum or hum.Health > 0) then
+
+                    if r then
                         local d = (r.Position - myPos).Magnitude
-                        if d < dist then
+                        if d < dist and d <= MAX_DISTANCE then
                             dist = d
                             closest = r
                         end
@@ -293,47 +302,37 @@ function GetClosestDragonTarget()
         end
     end
 
-    -- 4. SEA EVENTS normal (SeaBeasts, Terrorshark, etc.)
+    -- 4. SEA EVENTS
     if _G.G_AttackSeaEvents then
         pcall(function()
-            -- SeaBeasts
             local seaBeasts = workspace:FindFirstChild("SeaBeasts")
             if seaBeasts then
                 for _, beast in pairs(seaBeasts:GetChildren()) do
-                    if beast.Name ~= "Leviathan" then
-                        local hum = beast:FindFirstChildOfClass("Humanoid") or beast:FindFirstChild("Health")
-                        local r = beast:FindFirstChild("HumanoidRootPart") or beast.PrimaryPart or beast:FindFirstChild("Head")
+                    if beast.Name ~= "Leviathan" and IsAlive(beast) then
+                        local r = beast:FindFirstChild("HumanoidRootPart")
+                            or beast.PrimaryPart
+                            or beast:FindFirstChild("Head")
+                            or beast:FindFirstChildWhichIsA("BasePart")
+
                         if r then
-                            local alive = true
-                            if hum then
-                                if hum:IsA("Humanoid") then
-                                    alive = hum.Health > 0
-                                elseif hum:IsA("NumberValue") or hum:IsA("IntValue") then
-                                    alive = hum.Value > 0
-                                end
-                            end
-                            if alive then
-                                local d = (r.Position - myPos).Magnitude
-                                if d < dist then
-                                    dist = d
-                                    closest = r
-                                end
+                            local d = (r.Position - myPos).Magnitude
+                            if d < dist and d <= MAX_DISTANCE then
+                                dist = d
+                                closest = r
                             end
                         end
                     end
                 end
             end
 
-            -- Terrorshark
             local enemies = workspace:FindFirstChild("Enemies")
             if enemies then
                 for _, enemy in pairs(enemies:GetChildren()) do
-                    if enemy.Name == "Terrorshark" then
-                        local hum = enemy:FindFirstChildOfClass("Humanoid")
+                    if enemy.Name == "Terrorshark" and IsAlive(enemy) then
                         local r = enemy:FindFirstChild("HumanoidRootPart")
-                        if hum and hum.Health > 0 and r then
+                        if r then
                             local d = (r.Position - myPos).Magnitude
-                            if d < dist then
+                            if d < dist and d <= MAX_DISTANCE then
                                 dist = d
                                 closest = r
                             end
@@ -344,17 +343,22 @@ function GetClosestDragonTarget()
         end)
     end
 
-    -- 5. MOBS normales
+    -- 5. MOBS
     if _G.G_AttackMobs then
         local enemies = workspace:FindFirstChild("Enemies")
         if enemies then
             for _, enemy in pairs(enemies:GetChildren()) do
-                if enemy.Name ~= "Terrorshark" and not enemy.Name:find("Brigade") and not enemy.Name:find("Boat") then
-                    local hum = enemy:FindFirstChildOfClass("Humanoid")
+                local name = enemy.Name
+                local isSpecial = name == "Terrorshark"
+                    or name:find("Brigade")
+                    or name:find("Boat")
+                    or name:find("Ship")
+
+                if not isSpecial and IsAlive(enemy) then
                     local r = enemy:FindFirstChild("HumanoidRootPart")
-                    if hum and hum.Health > 0 and r then
+                    if r then
                         local d = (r.Position - myPos).Magnitude
-                        if d < dist then
+                        if d < dist and d <= MAX_DISTANCE then
                             dist = d
                             closest = r
                         end
@@ -368,11 +372,13 @@ function GetClosestDragonTarget()
     if _G.G_AttackPlayers then
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= player and not IsAlly(player, p) then
-                local hum = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
-                local r = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+                local pChar = p.Character
+                local hum = pChar and pChar:FindFirstChildOfClass("Humanoid")
+                local r = pChar and pChar:FindFirstChild("HumanoidRootPart")
+
                 if hum and hum.Health > 0 and r then
                     local d = (r.Position - myPos).Magnitude
-                    if d < dist then
+                    if d < dist and d <= MAX_DISTANCE then
                         dist = d
                         closest = r
                     end
@@ -445,7 +451,7 @@ circleStroke.Color = COLOR_BORDER
 circleStroke.Thickness = 1.4
 circleStroke.Transparency = 0.3
 
--- Panel principal (más alto por los 2 toggles nuevos)
+-- Panel principal
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainPanel"
 mainFrame.Size = UDim2.new(0, 230, 0, 440)
@@ -729,4 +735,4 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
-print("Edsusito Gun Aura cargado | Ships + Leviathan independientes")
+print("Edsusito Gun Aura cargado | Ships + Leviathan + Robustez")
