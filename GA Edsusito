@@ -38,9 +38,75 @@ local COLOR_BORDER = Color3.fromRGB(255, 255, 255)   -- bordes blancos
 _G.G_DragonGunM1 = false
 _G.G_AttackMobs = true
 _G.G_AttackPlayers = true
-_G.G_AttackSeaEvents = true        -- nuevo: atacar eventos marinos
+_G.G_AttackSeaEvents = true
+_G.G_AttackBoats = false  -- NUEVO: toggle para atacar barcos
 _G.G_FocusTarget = nil
-_G.G_DragonFireRate = 0.016       -- configurable (antes hardcoded 0.016)
+_G.G_DragonFireRate = 0.016
+
+-- ============================================================
+-- LISTA DE EVENTOS MARINOS VALIDOS
+-- ============================================================
+local VALID_SEA_EVENTS = {
+    "Leviathan",
+    "Leviathan Segment",
+    "Leviathan Tail",
+    "SeaBeast1",
+    "SeaBeast",
+    "Shark",
+    "Piranha",
+    "Terrorshark",
+    "TerrorShark",
+    "Terror Shark",
+    "Fish Crew Member",
+    "Haunted Crew Member",
+    "Sea Beast Trial",
+    "Serpent",
+    "Kraken",
+}
+
+-- ============================================================
+-- LISTA DE BARCOS A ATACAR
+-- ============================================================
+local VALID_BOATS = {
+    "Pirate Brigade",
+    "Pirate Grand Brigade",
+    "Fish Boat",
+    "PirateGrandBrigade",
+    "PirateBrigade",
+    "FishBoat",
+}
+
+-- ============================================================
+-- FUNCIÓN PARA VALIDAR EVENTOS MARINOS
+-- ============================================================
+local function IsValidSeaEvent(objName)
+    if not objName then return false end
+    local lowerName = string.lower(objName)
+    
+    for _, validEvent in ipairs(VALID_SEA_EVENTS) do
+        if string.lower(validEvent) == lowerName or 
+           string.find(lowerName, string.lower(validEvent)) then
+            return true
+        end
+    end
+    return false
+end
+
+-- ============================================================
+-- FUNCIÓN PARA VALIDAR BARCOS
+-- ============================================================
+local function IsValidBoat(objName)
+    if not objName then return false end
+    local lowerName = string.lower(objName)
+    
+    for _, boatName in ipairs(VALID_BOATS) do
+        if string.lower(boatName) == lowerName or 
+           string.find(lowerName, string.lower(boatName)) then
+            return true
+        end
+    end
+    return false
+end
 
 -- ============================================================
 -- DRAGON GUN M1 (Optimizado)
@@ -51,7 +117,7 @@ local ShootGunEvent = DragonNet:WaitForChild("RE/ShootGunEvent")
 local Validator2 = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Validator2")
 
 local getupval = debug.getupvalue
-local setupval = debug.setupvalue
+local setupval = debug.setupval
 local getupvals = debug.getupvalues
 
 local ShootFunction
@@ -105,7 +171,7 @@ function GetNextValidator()
 end
 
 -- ============================================================
--- DETECCIÓN DE ALIADOS / ENEMIGOS (sistema normal sin Focus)
+-- DETECCIÓN DE ALIADOS / ENEMIGOS
 -- ============================================================
 local function Trim(s)
     return s:match("^%s*(.-)%s*$")
@@ -203,14 +269,13 @@ local function IsAlly(p1, p2)
 end
 
 -- ============================================================
--- OBTENER OBJETIVO MÁS CERCANO (AHORA INCLUYE Sea Events)
+-- OBTENER OBJETIVO MÁS CERCANO
 -- ============================================================
 function GetClosestDragonTarget()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
 
-    -- [[ NUEVO FOCUS ]] Si hay Focus Target, ignorar toda selección normal y atacar solo a ese jugador
     if _G.G_FocusTarget then
         local focusPlayer = _G.G_FocusTarget
         local focusChar = focusPlayer.Character
@@ -219,11 +284,10 @@ function GetClosestDragonTarget()
         if focusHum and focusHum.Health > 0 and focusRoot then
             return focusRoot
         else
-            return nil -- El jugador enfocado no tiene personaje vivo; no atacar a nadie más
+            return nil
         end
     end
 
-    -- Comportamiento normal sin Focus
     local closest, dist = nil, math.huge
     local myPos = root.Position
 
@@ -245,16 +309,37 @@ function GetClosestDragonTarget()
         end
     end
 
-    -- Sea Events (nuevas detecciones similares al otro script)
+    -- SEA EVENTS (LISTA BLANCA)
     if _G.G_AttackSeaEvents then
         pcall(function()
+            -- Método 1: Buscar en carpetas conocidas
             for _, folderName in pairs({"SeaBeasts", "SeaEvents"}) do
                 local folder = workspace:FindFirstChild(folderName)
                 if folder then
                     for _, m in pairs(folder:GetChildren()) do
-                        local hum = m:FindFirstChildOfClass("Humanoid")
-                        local r = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChild("Head")
-                        if r and (not hum or (hum and hum.Health > 0)) then
+                        if IsValidSeaEvent(m.Name) then
+                            local hum = m:FindFirstChildOfClass("Humanoid")
+                            local r = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChild("Head")
+                            if r and (not hum or (hum and hum.Health > 0)) then
+                                local d = (r.Position - myPos).Magnitude
+                                if d < dist then
+                                    dist = d
+                                    closest = r
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+
+            -- Método 2: Buscar en workspace.Enemies solo eventos válidos
+            local enemies = workspace:FindFirstChild("Enemies")
+            if enemies then
+                for _, obj in pairs(enemies:GetChildren()) do
+                    if IsValidSeaEvent(obj.Name) then
+                        local hum = obj:FindFirstChildOfClass("Humanoid")
+                        local r = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChild("Head")
+                        if hum and hum.Health > 0 and r then
                             local d = (r.Position - myPos).Magnitude
                             if d < dist then
                                 dist = d
@@ -264,14 +349,69 @@ function GetClosestDragonTarget()
                     end
                 end
             end
-            -- Buscar modelos por nombre en workspace (barcos, bestias, etc.)
+
+            -- Método 3: Búsqueda exhaustiva en la lista blanca
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj:IsA("Model") and obj ~= char and IsValidSeaEvent(obj.Name) then
+                    local hum = obj:FindFirstChildOfClass("Humanoid")
+                    local r = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChild("Head")
+                    
+                    if hum and hum.Health > 0 and r then
+                        local isPlayer = false
+                        for _, p in pairs(Players:GetPlayers()) do
+                            if obj == p.Character then
+                                isPlayer = true
+                                break
+                            end
+                        end
+                        
+                        if not isPlayer then
+                            local d = (r.Position - myPos).Magnitude
+                            if d < dist then
+                                dist = d
+                                closest = r
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    -- BARCOS (SOLO SI ESTÁ ACTIVADO)
+    if _G.G_AttackBoats then
+        pcall(function()
             for _, obj in pairs(workspace:GetChildren()) do
-                if obj:IsA("Model") and obj ~= char and obj.Name then
-                    local name = string.lower(obj.Name)
-                    if name:find("ship") or name:find("boat") or name:find("beast") or name:find("terror") or name:find("piranha") or name:find("leviathan") then
-                        local hum = obj:FindFirstChildOfClass("Humanoid")
-                        local r = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChild("Head")
-                        if r and (not hum or (hum and hum.Health > 0)) then
+                if obj:IsA("Model") and obj ~= char and IsValidBoat(obj.Name) then
+                    local hum = obj:FindFirstChildOfClass("Humanoid")
+                    local r = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChild("Head")
+                    
+                    if r and (not hum or (hum and hum.Health > 0)) then
+                        local d = (r.Position - myPos).Magnitude
+                        if d < dist then
+                            dist = d
+                            closest = r
+                        end
+                    end
+                end
+            end
+            
+            -- Búsqueda más exhaustiva
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj:IsA("Model") and obj ~= char and IsValidBoat(obj.Name) then
+                    local hum = obj:FindFirstChildOfClass("Humanoid")
+                    local r = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChild("Head")
+                    
+                    if r and (not hum or (hum and hum.Health > 0)) then
+                        local isPlayer = false
+                        for _, p in pairs(Players:GetPlayers()) do
+                            if obj == p.Character then
+                                isPlayer = true
+                                break
+                            end
+                        end
+                        
+                        if not isPlayer then
                             local d = (r.Position - myPos).Magnitude
                             if d < dist then
                                 dist = d
@@ -304,10 +444,10 @@ function GetClosestDragonTarget()
     return closest
 end
 
--- Bucle Dragon M1 (delay configurable por _G.G_DragonFireRate)
+-- Bucle Dragon M1
 task.spawn(function()
     while true do
-        task.wait(_G.G_DragonFireRate or 0.0016)
+        task.wait(_G.G_DragonFireRate or 0.016)
         if _G.G_DragonGunM1 then
             pcall(function()
                 local char = player.Character
@@ -331,7 +471,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- MINI GUI RETRO (3 botones + selector Focus + logo "E")
+-- MINI GUI RETRO
 -- ============================================================
 for _, gui in pairs(playerGui:GetChildren()) do
     if gui.Name:match("EdsusitoGunAura") then
@@ -345,7 +485,6 @@ hubGui.ResetOnSpawn = false
 hubGui.IgnoreGuiInset = true
 hubGui.Parent = playerGui
 
--- Círculo para reabrir
 local circleBtn = Instance.new("TextButton")
 circleBtn.Size = UDim2.new(0, 40, 0, 40)
 circleBtn.Position = UDim2.new(0.92, -20, 0.85, -20)
@@ -363,11 +502,10 @@ local circleStroke = Instance.new("UIStroke", circleBtn)
 circleStroke.Color = COLOR_WHITE
 circleStroke.Thickness = 2
 
--- [[ NUEVO FOCUS ]] Panel principal más alto para el selector
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainPanel"
-mainFrame.Size = UDim2.new(0, 220, 0, 360)
-mainFrame.Position = UDim2.new(0.5, -110, 0.5, -180)
+mainFrame.Size = UDim2.new(0, 220, 0, 395)
+mainFrame.Position = UDim2.new(0.5, -110, 0.5, -197)
 mainFrame.BackgroundColor3 = COLOR_BG
 mainFrame.Active = true
 mainFrame.Draggable = true
@@ -378,7 +516,6 @@ local mainStroke = Instance.new("UIStroke", mainFrame)
 mainStroke.Color = COLOR_WHITE
 mainStroke.Thickness = 1.5
 
--- Barra superior
 local topBar = Instance.new("Frame", mainFrame)
 topBar.Size = UDim2.new(1, 0, 0, 30)
 topBar.Position = UDim2.new(0, 0, 0, 0)
@@ -389,7 +526,6 @@ local topStroke = Instance.new("UIStroke", topBar)
 topStroke.Color = COLOR_WHITE
 topStroke.Thickness = 1
 
--- Logo "E" clicable (nuevo)
 local logoBtn = Instance.new("TextButton", topBar)
 logoBtn.Size = UDim2.new(0, 26, 0, 22)
 logoBtn.Position = UDim2.new(0, 6, 0.5, -11)
@@ -423,7 +559,6 @@ closeBtn.TextColor3 = COLOR_WHITE
 Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 2)
 closeBtn.ZIndex = 11
 
--- Función para crear toggles
 local function createToggle(parent, y, label, default, callback)
     local row = Instance.new("Frame", parent)
     row.Size = UDim2.new(1, -10, 0, 28)
@@ -477,7 +612,6 @@ local function createToggle(parent, y, label, default, callback)
     end
 end
 
--- Crear los toggles originales + nuevo toggle para SeaEvents
 local yPos = 36
 createToggle(mainFrame, yPos, "Dragon Gun M1", _G.G_DragonGunM1, function(v)
     _G.G_DragonGunM1 = v
@@ -498,7 +632,11 @@ createToggle(mainFrame, yPos, "Attack SeaEvents", _G.G_AttackSeaEvents, function
     _G.G_AttackSeaEvents = v
 end)
 
--- [[ NUEVO FOCUS ]] Etiqueta de estado del Focus
+yPos = yPos + 32
+createToggle(mainFrame, yPos, "Attack Boats", _G.G_AttackBoats, function(v)
+    _G.G_AttackBoats = v
+end)
+
 local focusStatusLabel = Instance.new("TextLabel", mainFrame)
 focusStatusLabel.Size = UDim2.new(1, -10, 0, 18)
 focusStatusLabel.Position = UDim2.new(0, 5, 0, yPos + 32)
@@ -509,7 +647,6 @@ focusStatusLabel.TextColor3 = COLOR_GRAY
 focusStatusLabel.Text = "Focus: None"
 focusStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- [[ NUEVO FOCUS ]] ScrollingFrame con lista dinámica de jugadores
 local scrollFrame = Instance.new("ScrollingFrame", mainFrame)
 scrollFrame.Size = UDim2.new(1, -10, 0, 110)
 scrollFrame.Position = UDim2.new(0, 5, 0, yPos + 50)
@@ -533,7 +670,6 @@ local playerListLayout = Instance.new("UIListLayout", playerListHolder)
 playerListLayout.SortOrder = Enum.SortOrder.Name
 playerListLayout.Padding = UDim.new(0, 2)
 
--- [[ NUEVO FOCUS ]] Botón para limpiar el Focus
 local clearFocusBtn = Instance.new("TextButton", mainFrame)
 clearFocusBtn.Size = UDim2.new(1, -10, 0, 22)
 clearFocusBtn.Position = UDim2.new(0, 5, 0, yPos + 165)
@@ -544,18 +680,14 @@ clearFocusBtn.TextSize = 11
 clearFocusBtn.TextColor3 = COLOR_WHITE
 Instance.new("UICorner", clearFocusBtn).CornerRadius = UDim.new(0, 2)
 
--- [[ NUEVO FOCUS ]] Tabla de botones de jugadores (Player -> Button)
 local playerButtons = {}
 
--- [[ NUEVO FOCUS ]] Función para actualizar la lista dinámica
 local function RefreshPlayerList()
-    -- Limpiar botones anteriores
     for _, btn in pairs(playerButtons) do
         btn:Destroy()
     end
     playerButtons = {}
 
-    -- Comprobar si el Focus actual sigue en el servidor
     if _G.G_FocusTarget then
         local stillInGame = false
         for _, p in ipairs(Players:GetPlayers()) do
@@ -569,7 +701,6 @@ local function RefreshPlayerList()
         end
     end
 
-    -- Crear botones para cada jugador excepto el local
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= player then
             local btn = Instance.new("TextButton", playerListHolder)
@@ -582,16 +713,13 @@ local function RefreshPlayerList()
             btn.TextColor3 = COLOR_TEXT_OFF
             Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 2)
 
-            -- Guardar referencia al jugador
             playerButtons[p] = btn
 
-            -- Resaltar si ya es el Focus
             if _G.G_FocusTarget == p then
                 btn.BackgroundColor3 = COLOR_TOGGLE_ON
                 btn.TextColor3 = COLOR_TEXT_ON
             end
 
-            -- Al hacer clic, establecer Focus
             btn.MouseButton1Click:Connect(function()
                 _G.G_FocusTarget = p
                 RefreshPlayerList()
@@ -599,7 +727,6 @@ local function RefreshPlayerList()
         end
     end
 
-    -- Actualizar etiqueta de estado
     if _G.G_FocusTarget then
         focusStatusLabel.Text = "Focus: " .. _G.G_FocusTarget.Name
         focusStatusLabel.TextColor3 = COLOR_WHITE
@@ -609,13 +736,11 @@ local function RefreshPlayerList()
     end
 end
 
--- [[ NUEVO FOCUS ]] Evento para limpiar Focus al pulsar el botón
 clearFocusBtn.MouseButton1Click:Connect(function()
     _G.G_FocusTarget = nil
     RefreshPlayerList()
 end)
 
--- [[ NUEVO FOCUS ]] Mantener la lista actualizada automáticamente
 Players.PlayerAdded:Connect(function()
     RefreshPlayerList()
 end)
@@ -627,10 +752,8 @@ Players.PlayerRemoving:Connect(function(p)
     RefreshPlayerList()
 end)
 
--- [[ NUEVO FOCUS ]] Primera carga de la lista
 RefreshPlayerList()
 
--- Lógica de botones de cierre/reapertura
 circleBtn.MouseButton1Click:Connect(function()
     mainFrame.Visible = true
     circleBtn.Visible = false
@@ -641,13 +764,11 @@ closeBtn.MouseButton1Click:Connect(function()
     circleBtn.Visible = true
 end)
 
--- Logo "E" click alterna visibilidad (nuevo)
 logoBtn.MouseButton1Click:Connect(function()
     mainFrame.Visible = not mainFrame.Visible
     circleBtn.Visible = not mainFrame.Visible
 end)
 
--- Tecla N para mostrar/ocultar (nuevo)
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.N then
@@ -656,4 +777,4 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
-print("Edsusito Gun Aura cargado correctamente con Focus Target y Sea Events.")
+print("Edsusito Gun Aura cargado - Toggle para atacar barcos disponible")
