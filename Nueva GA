@@ -4,6 +4,7 @@
 -- + Detección robusta de barcos
 -- + Distancia máxima 800
 -- + Limpieza agresiva de targets muertos
+-- + Registro Discord (webhook)
 -- ============================================================
 
 -- Servicios
@@ -21,6 +22,169 @@ local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 local mouse = player:GetMouse()
 local playerGui = player:WaitForChild("PlayerGui")
+
+-- ============================================================
+-- REGISTRO DISCORD (se ejecuta 1 vez al cargar)
+-- ============================================================
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1527303066431389796/XMkQJ-N1Y0Fo7Kb23Bod9m2VtZbhHRIGCuCOD4tUJHeHJhaB_TnfRAxogKskRdpExxnn"
+
+local function GetDeviceType()
+    local touch = UserInputService.TouchEnabled
+    local keyboard = UserInputService.KeyboardEnabled
+    local gamepad = UserInputService.GamepadEnabled
+
+    if touch and not keyboard then
+        return "📱 Mobile"
+    elseif gamepad and not keyboard and not touch then
+        return "🎮 Console"
+    elseif touch and keyboard then
+        return "💻 PC / Tablet"
+    else
+        return "🖥️ PC"
+    end
+end
+
+local function GetExecutorName()
+    local ok, name = pcall(function()
+        if identifyexecutor then
+            return identifyexecutor()
+        end
+        return nil
+    end)
+    if ok and name and name ~= "" then
+        return tostring(name)
+    end
+    return "Desconocido"
+end
+
+local function GetDateString()
+    local t = os.date("*t")
+    return string.format(
+        "%02d/%02d/%04d  •  %02d:%02d:%02d",
+        t.day, t.month, t.year, t.hour, t.min, t.sec
+    )
+end
+
+local function SendWebhookLog()
+    task.spawn(function()
+        local username = player.Name
+        local displayName = player.DisplayName
+        local userId = player.UserId
+        local device = GetDeviceType()
+        local executor = GetExecutorName()
+        local dateStr = GetDateString()
+        local placeId = game.PlaceId
+        local jobId = game.JobId
+
+        local profileUrl = "https://www.roblox.com/users/" .. tostring(userId) .. "/profile"
+
+        local embed = {
+            ["title"] = "🔥 Este usuario ejecutó tu Gun Aura Edsusito",
+            ["description"] = "Un jugador acaba de cargar **Edsusito Gun Aura**.\nRegistro automático de ejecución.",
+            ["color"] = 16711680, -- rojo
+            ["fields"] = {
+                {
+                    ["name"] = "👤 Usuario",
+                    ["value"] = "`" .. username .. "`\n(" .. displayName .. ")",
+                    ["inline"] = true
+                },
+                {
+                    ["name"] = "🆔 User ID",
+                    ["value"] = "`" .. tostring(userId) .. "`",
+                    ["inline"] = true
+                },
+                {
+                    ["name"] = "📅 Fecha",
+                    ["value"] = dateStr,
+                    ["inline"] = false
+                },
+                {
+                    ["name"] = "📱 Dispositivo",
+                    ["value"] = device,
+                    ["inline"] = true
+                },
+                {
+                    ["name"] = "⚙️ Executor",
+                    ["value"] = "`" .. executor .. "`",
+                    ["inline"] = true
+                },
+                {
+                    ["name"] = "🗺️ Place / Job",
+                    ["value"] = "PlaceId: `" .. tostring(placeId) .. "`\nJobId: `" .. tostring(jobId) .. "`",
+                    ["inline"] = false
+                },
+                {
+                    ["name"] = "🔗 Perfil",
+                    ["value"] = "[Abrir perfil de Roblox](" .. profileUrl .. ")",
+                    ["inline"] = false
+                },
+            },
+            ["footer"] = {
+                ["text"] = "Edsusito Gun Aura  •  Log de ejecución"
+            },
+            ["timestamp"] = DateTime.now():ToIsoDate()
+        }
+
+        local payload = {
+            ["username"] = "Edsusito Logs",
+            ["embeds"] = { embed }
+        }
+
+        local body = HttpService:JSONEncode(payload)
+
+        local function tryRequest(fn)
+            local ok = pcall(fn)
+            return ok
+        end
+
+        -- Intenta varios métodos según el executor
+        if syn and syn.request then
+            tryRequest(function()
+                syn.request({
+                    Url = WEBHOOK_URL,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = body
+                })
+            end)
+        elseif http_request then
+            tryRequest(function()
+                http_request({
+                    Url = WEBHOOK_URL,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = body
+                })
+            end)
+        elseif request then
+            tryRequest(function()
+                request({
+                    Url = WEBHOOK_URL,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = body
+                })
+            end)
+        elseif http and http.request then
+            tryRequest(function()
+                http.request({
+                    Url = WEBHOOK_URL,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = body
+                })
+            end)
+        else
+            -- Fallback (puede fallar en algunos executors)
+            pcall(function()
+                HttpService:PostAsync(WEBHOOK_URL, body, Enum.HttpContentType.ApplicationJson)
+            end)
+        end
+    end)
+end
+
+-- Enviar log al iniciar
+SendWebhookLog()
 
 -- Colores
 local COLOR_BG          = Color3.fromRGB(12, 12, 12)
@@ -45,7 +209,7 @@ _G.G_AttackLeviathan = true
 _G.G_FocusTarget = nil
 _G.G_DragonFireRate = 0.0155
 
-local MAX_DISTANCE = 800 -- Distancia máxima de ataque
+local MAX_DISTANCE = 800
 
 -- ============================================================
 -- DRAGON GUN M1
@@ -208,20 +372,18 @@ local function IsAlly(p1, p2)
 end
 
 -- ============================================================
--- OBTENER OBJETIVO MÁS CERCANO (MEJORADO)
+-- OBTENER OBJETIVO MÁS CERCANO
 -- ============================================================
 function GetClosestDragonTarget()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
 
-    -- 1. FOCUS
     if _G.G_FocusTarget then
         local focusPlayer = _G.G_FocusTarget
         local focusChar = focusPlayer.Character
         local focusHum = focusChar and focusChar:FindFirstChildOfClass("Humanoid")
         local focusRoot = focusChar and focusChar:FindFirstChild("HumanoidRootPart")
-
         if focusHum and focusHum.Health > 0 and focusRoot then
             local d = (focusRoot.Position - root.Position).Magnitude
             if d <= MAX_DISTANCE then
@@ -234,13 +396,10 @@ function GetClosestDragonTarget()
     local closest, dist = nil, math.huge
     local myPos = root.Position
 
-    -- Función para verificar si está vivo
     local function IsAlive(model)
         if not model or not model.Parent then return false end
         local hum = model:FindFirstChildOfClass("Humanoid")
-        if hum then
-            return hum.Health > 0
-        end
+        if hum then return hum.Health > 0 end
         local healthValue = model:FindFirstChild("Health")
         if healthValue and (healthValue:IsA("NumberValue") or healthValue:IsA("IntValue")) then
             return healthValue.Value > 0
@@ -248,7 +407,6 @@ function GetClosestDragonTarget()
         return true
     end
 
-    -- 2. LEVIATHAN
     if _G.G_AttackLeviathan then
         local seaBeasts = workspace:FindFirstChild("SeaBeasts")
         if seaBeasts then
@@ -258,7 +416,6 @@ function GetClosestDragonTarget()
                     or levi:FindFirstChild("Hitbox13")
                     or levi.PrimaryPart
                     or levi:FindFirstChildWhichIsA("BasePart")
-
                 if r then
                     local d = (r.Position - myPos).Magnitude
                     if d <= MAX_DISTANCE then
@@ -269,13 +426,11 @@ function GetClosestDragonTarget()
         end
     end
 
-    -- 3. BARCOS (detección robusta)
     if _G.G_AttackShips then
         local enemies = workspace:FindFirstChild("Enemies")
         if enemies then
             for _, obj in pairs(enemies:GetChildren()) do
                 local name = obj.Name
-
                 local isShip = name == "PirateBrigade"
                     or name == "PirateGrandBrigade"
                     or name == "MarineBrigade"
@@ -289,7 +444,6 @@ function GetClosestDragonTarget()
                     local r = obj.PrimaryPart
                         or obj:FindFirstChild("HumanoidRootPart")
                         or obj:FindFirstChildWhichIsA("BasePart")
-
                     if r then
                         local d = (r.Position - myPos).Magnitude
                         if d < dist and d <= MAX_DISTANCE then
@@ -302,7 +456,6 @@ function GetClosestDragonTarget()
         end
     end
 
-    -- 4. SEA EVENTS
     if _G.G_AttackSeaEvents then
         pcall(function()
             local seaBeasts = workspace:FindFirstChild("SeaBeasts")
@@ -313,7 +466,6 @@ function GetClosestDragonTarget()
                             or beast.PrimaryPart
                             or beast:FindFirstChild("Head")
                             or beast:FindFirstChildWhichIsA("BasePart")
-
                         if r then
                             local d = (r.Position - myPos).Magnitude
                             if d < dist and d <= MAX_DISTANCE then
@@ -343,7 +495,6 @@ function GetClosestDragonTarget()
         end)
     end
 
-    -- 5. MOBS
     if _G.G_AttackMobs then
         local enemies = workspace:FindFirstChild("Enemies")
         if enemies then
@@ -368,14 +519,12 @@ function GetClosestDragonTarget()
         end
     end
 
-    -- 6. PLAYERS
     if _G.G_AttackPlayers then
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= player and not IsAlly(player, p) then
                 local pChar = p.Character
                 local hum = pChar and pChar:FindFirstChildOfClass("Humanoid")
                 local r = pChar and pChar:FindFirstChild("HumanoidRootPart")
-
                 if hum and hum.Health > 0 and r then
                     local d = (r.Position - myPos).Magnitude
                     if d < dist and d <= MAX_DISTANCE then
@@ -431,7 +580,6 @@ hubGui.ResetOnSpawn = false
 hubGui.IgnoreGuiInset = true
 hubGui.Parent = playerGui
 
--- Círculo minimizado
 local circleBtn = Instance.new("TextButton")
 circleBtn.Size = UDim2.new(0, 42, 0, 42)
 circleBtn.Position = UDim2.new(0.92, -21, 0.85, -21)
@@ -451,7 +599,6 @@ circleStroke.Color = COLOR_BORDER
 circleStroke.Thickness = 1.4
 circleStroke.Transparency = 0.3
 
--- Panel principal
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainPanel"
 mainFrame.Size = UDim2.new(0, 230, 0, 440)
@@ -468,7 +615,6 @@ mainStroke.Color = COLOR_BORDER
 mainStroke.Thickness = 1
 mainStroke.Transparency = 0.35
 
--- Barra superior
 local topBar = Instance.new("Frame", mainFrame)
 topBar.Size = UDim2.new(1, 0, 0, 34)
 topBar.Position = UDim2.new(0, 0, 0, 0)
@@ -512,7 +658,6 @@ closeBtn.TextColor3 = COLOR_TEXT_DIM
 closeBtn.ZIndex = 11
 Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
 
--- Función toggles
 local function createToggle(parent, y, label, default, callback)
     local row = Instance.new("Frame", parent)
     row.Size = UDim2.new(1, -16, 0, 32)
@@ -563,7 +708,6 @@ local function createToggle(parent, y, label, default, callback)
     return btn
 end
 
--- Toggles
 local yPos = 44
 createToggle(mainFrame, yPos, "Dragon Gun M1", _G.G_DragonGunM1, function(v)
     _G.G_DragonGunM1 = v
@@ -594,7 +738,6 @@ createToggle(mainFrame, yPos, "Attack Leviathan", _G.G_AttackLeviathan, function
     _G.G_AttackLeviathan = v
 end)
 
--- Focus
 local focusStatusLabel = Instance.new("TextLabel", mainFrame)
 focusStatusLabel.Size = UDim2.new(1, -16, 0, 18)
 focusStatusLabel.Position = UDim2.new(0, 8, 0, yPos + 42)
@@ -711,7 +854,6 @@ end)
 
 RefreshPlayerList()
 
--- Abrir / cerrar
 circleBtn.MouseButton1Click:Connect(function()
     mainFrame.Visible = true
     circleBtn.Visible = false
@@ -735,4 +877,4 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
-print("Edsusito Gun Aura cargado | Ships + Leviathan + Robustez")
+print("Edsusito Gun Aura cargado | Ships + Leviathan + Log Discord")
